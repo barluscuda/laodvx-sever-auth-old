@@ -1,0 +1,7 @@
+bin/
+dist/
+data/
+.env
+.env.local
+.git/
+*.md

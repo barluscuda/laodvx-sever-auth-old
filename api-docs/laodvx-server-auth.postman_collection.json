@@ -1,0 +1,563 @@
+{
+  "info": {
+    "name": "laodvx-server-auth",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for `laodvx-server-auth`.\n\nUse this collection when you want to test the full auth flow without building requests manually.\n\n**How hosts work**\n- Tenant routes use `{{server_id}}.{{base_domain}}`\n- System admin routes use `{{base_domain}}`\n- Dev routes use `{{base_domain}}:{{dev_port}}`\n\n**Default local ports**\n- Main server: `3220`\n- Dev server: `3221`\n\n**Auth methods**\n- Tenant and system protected routes use `Authorization: Bearer <access_token>`\n- Dev routes use `X-Dev-API-Key: {{dev_api_key}}`\n\n**Recommended order**\n1. Create or obtain a system admin\n2. Run system admin login\n3. Create a tenant server\n4. Set `server_id`\n5. Register a tenant user (202 — OTP sent to email)\n6. Verify OTP with Verify Email\n7. Run user login\n8. Call protected tenant routes\n\n**Collection variables**\n- `base_domain`: usually `auth.localhost`\n- `dev_port`: usually `3221`\n- `server_id`: tenant server UUID\n- `system_access_token`: set automatically after system login\n- `system_refresh_token`: set automatically after system refresh/login\n- `user_access_token`: set automatically after user login\n- `user_refresh_token`: set automatically after user refresh/login\n- `dev_api_key`: your `DEV_API_KEY` value\n\n**Local setup tip**\nAdd hosts like these:\n```\n127.0.0.1 auth.localhost\n127.0.0.1 <server-uuid>.auth.localhost\n```"
+  },
+  "variable": [
+    { "key": "base_domain",           "value": "auth.localhost",       "type": "string" },
+    { "key": "dev_port",              "value": "3221",                 "type": "string" },
+    { "key": "server_id",             "value": "",                      "type": "string" },
+    { "key": "system_access_token",   "value": "",                      "type": "string" },
+    { "key": "system_refresh_token",  "value": "",                      "type": "string" },
+    { "key": "user_access_token",     "value": "",                      "type": "string" },
+    { "key": "user_refresh_token",    "value": "",                      "type": "string" },
+    { "key": "dev_api_key",           "value": "",                      "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Public",
+      "description": "Public endpoints on the main server. No token required.",
+      "item": [
+        {
+          "name": "JWKS (public keys)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://{{base_domain}}/.well-known/jwks.json",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": [".well-known", "jwks.json"]
+            },
+            "description": "Returns the public JWK Set used to verify access tokens (ES256). Consumers can use this to validate JWTs without contacting the auth server on every request."
+          }
+        },
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/ping",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "ping"]
+            },
+            "description": "Liveness probe. Returns 200 if the server is up and the `server_id` exists."
+          }
+        }
+      ]
+    },
+    {
+      "name": "System Auth",
+      "description": "System admin login and refresh. Start here if you want to manage tenant servers.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('system_access_token', json.access_token);",
+                  "  pm.collectionVariables.set('system_refresh_token', json.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/auth/login",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"changeme\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Authenticates a system administrator. On success the test script stores `system_access_token` and `system_refresh_token` in collection variables.\n\n**Response 200**\n```json\n{\n  \"access_token\": \"<jwt>\",\n  \"refresh_token\": \"<jwt>\"\n}\n```\n\n**Response 429** — account temporarily locked (too many failed attempts)."
+          }
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('system_access_token', json.access_token);",
+                  "  pm.collectionVariables.set('system_refresh_token', json.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/auth/refresh",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "auth", "refresh"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{system_refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Exchanges a valid system-admin refresh token for a new access/refresh token pair. Refresh tokens are single-use; using an already-used token returns 401."
+          }
+        }
+      ]
+    },
+    {
+      "name": "System Admin — Servers",
+      "description": "Create, list, update, and delete tenant servers. Requires `system_access_token`.",
+      "item": [
+        {
+          "name": "Create Server",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{system_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/server",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "server"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my-server\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates a new server. `name` must be 1–100 characters.\n\n**Response 201** — `ServerResponse`\n```json\n{\n  \"id\": \"<uuid>\",\n  \"name\": \"my-server\",\n  \"created_at\": \"2006-01-02T15:04:05Z\",\n  \"updated_at\": \"2006-01-02T15:04:05Z\"\n}\n```"
+          }
+        },
+        {
+          "name": "Get All Servers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{system_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/server",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "server"]
+            },
+            "description": "Returns an array of all servers.\n\n**Response 200** — `ServerResponse[]`"
+          }
+        },
+        {
+          "name": "Get Server by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{system_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/server/:id",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "server", ":id"],
+              "variable": [{ "key": "id", "value": "{{server_id}}", "description": "Server UUID" }]
+            },
+            "description": "Returns a single server by UUID.\n\n**Response 404** — `{\"error\": \"server not found\"}`"
+          }
+        },
+        {
+          "name": "Update Server",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{system_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/server/:id",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "server", ":id"],
+              "variable": [{ "key": "id", "value": "{{server_id}}", "description": "Server UUID" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"new-name\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Renames a server. `name` must be 1–100 characters.\n\n**Response 200** — updated `ServerResponse`"
+          }
+        },
+        {
+          "name": "Delete Server",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{system_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/server/:id",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "server", ":id"],
+              "variable": [{ "key": "id", "value": "{{server_id}}", "description": "Server UUID" }]
+            },
+            "description": "Deletes a server by UUID.\n\n**Response 204** — no body."
+          }
+        }
+      ]
+    },
+    {
+      "name": "System Admin — Users",
+      "description": "Look up users across all tenant servers. Requires `system_access_token`.",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{system_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/user",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "user"],
+              "query": [
+                { "key": "server_id", "value": "", "description": "Filter by server UUID (optional)", "disabled": true },
+                { "key": "email",     "value": "", "description": "Filter by email (optional)",      "disabled": true }
+              ]
+            },
+            "description": "Returns users, with optional filtering:\n\n| Query params | Behaviour |\n|---|---|\n| *(none)* | All users across all servers — returns `UserResponse[]` |\n| `server_id` only | All users on that server — returns `UserResponse[]` |\n| `email` only | All accounts with that email — returns `UserResponse[]` |\n| `server_id` + `email` | Single user lookup — returns `UserResponse` |\n\n**Response 200** — `UserResponse` or `UserResponse[]`"
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{system_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}/system/api/user/:id",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "path": ["system", "api", "user", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "User UUID" }]
+            },
+            "description": "Returns a single user by UUID (global, not scoped to a server).\n\n**Response 200** — `UserResponse`\n\n**Response 404** — `{\"error\": \"user not found\"}`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Auth",
+      "description": "Authentication for end-users scoped to a specific server.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('user_access_token', json.access_token);",
+                  "  pm.collectionVariables.set('user_refresh_token', json.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/auth/login",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Authenticates a user on the given server. On success the test script stores `user_access_token` and `user_refresh_token` in collection variables.\n\nThe JWT's `server_id` claim is bound to `{{server_id}}`; it cannot be used against a different server.\n\n**Response 200** — `TokenResponse`\n\n**Response 401** — invalid credentials\n\n**Response 429** — account temporarily locked"
+          }
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('user_access_token', json.access_token);",
+                  "  pm.collectionVariables.set('user_refresh_token', json.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/auth/refresh",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "auth", "refresh"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{user_refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Exchanges a valid user refresh token for a new access/refresh pair. Single-use — a replayed token returns 401 with `\"refresh token already used\"`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "End-user self-service endpoints scoped to a specific server.",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/user",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "user"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Starts registration for a new user account. Validates the email and password, stores a pending registration in Redis, and sends a 6-digit OTP to the email address. The user is **not** written to the database until the OTP is verified.\n\n- `email` — valid email address\n- `password` — minimum 8 characters; weak passwords are rejected with 400\n\n**Response 202** — no body; OTP sent to email address\n\n**Response 400** — weak password or invalid body\n\n**Response 409** — email already registered or pending verification"
+          }
+        },
+        {
+          "name": "Verify Email",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/auth/verify-email",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "auth", "verify-email"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Completes registration by verifying the 6-digit OTP sent to the email address. The user record is written to the database on success.\n\n- `email` — the address used during registration\n- `otp` — the 6-digit code from the verification email\n\n**Response 204** — verification successful; user can now log in\n\n**Response 400** — missing or invalid body\n\n**Response 422** — OTP is wrong or expired (`err_verification_token_invalid`)"
+          }
+        },
+        {
+          "name": "Resend Verification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/user/resend-verification",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "user", "resend-verification"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Generates a new OTP and resends the verification email for a pending (unverified) registration. Always returns `202` regardless of whether the email is registered, to avoid revealing registration status.\n\n**Response 202** — no body"
+          }
+        },
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/user/me",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "user", "me"]
+            },
+            "description": "Returns the authenticated user's own profile. Requires a valid JWT with role `user` or `user_admin` whose `server_id` claim matches `:server_id`.\n\n**Response 200** — `UserResponse`\n\n**Response 401** — missing or invalid token\n\n**Response 403** — token belongs to a different server"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Admin",
+      "description": "Server-scoped user management. Requires a JWT with role `user_admin` for the matching server (`user_access_token` set to a user-admin token).",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/admin/user",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "admin", "user"],
+              "query": [
+                { "key": "email", "value": "", "description": "Filter by exact email — returns single UserResponse when provided", "disabled": true }
+              ]
+            },
+            "description": "Returns all users on `{{server_id}}`.\n\nIf `?email=` is provided it performs an exact lookup and returns a single `UserResponse` (or 404).\n\n**Response 200** — `UserResponse[]` or `UserResponse`"
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_access_token}}" }
+            ],
+            "url": {
+              "raw": "http://{{server_id}}.{{base_domain}}/api/admin/user/:id",
+              "protocol": "http",
+              "host": ["{{server_id}}", "{{base_domain}}"],
+              "path": ["api", "admin", "user", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "User UUID" }]
+            },
+            "description": "Returns a single user by UUID, scoped to `{{server_id}}`.\n\n**Response 200** — `UserResponse`\n\n**Response 404** — user not found"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dev Server",
+      "description": "Endpoints on the dev server (port 3221, non-release mode only). All requests require the `X-Dev-API-Key` header matching `DEV_API_KEY`.",
+      "item": [
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-API-Key", "value": "{{dev_api_key}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}:{{dev_port}}/api/status",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "port": "{{dev_port}}",
+              "path": ["api", "status"]
+            },
+            "description": "Returns server status / health information."
+          }
+        },
+        {
+          "name": "Create System Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "X-Dev-API-Key", "value": "{{dev_api_key}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}:{{dev_port}}/api/system/admin",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "port": "{{dev_port}}",
+              "path": ["api", "system", "admin"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"changeme1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates a new system administrator account.\n\n- `username` — 3–100 characters\n- `password` — minimum 8 characters\n\n**Response 201** — `SystemAdminResponse`\n```json\n{\n  \"id\": \"<uuid>\",\n  \"username\": \"admin\",\n  \"created_at\": \"2006-01-02T15:04:05Z\",\n  \"updated_at\": \"2006-01-02T15:04:05Z\"\n}\n```"
+          }
+        },
+        {
+          "name": "Get All System Admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-API-Key", "value": "{{dev_api_key}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}:{{dev_port}}/api/system/admin",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "port": "{{dev_port}}",
+              "path": ["api", "system", "admin"]
+            },
+            "description": "Returns all system administrator accounts.\n\n**Response 200** — `SystemAdminResponse[]`"
+          }
+        },
+        {
+          "name": "Get System Admin by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-API-Key", "value": "{{dev_api_key}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}:{{dev_port}}/api/system/admin/:id",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "port": "{{dev_port}}",
+              "path": ["api", "system", "admin", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "System admin UUID" }]
+            },
+            "description": "Returns a single system administrator by UUID.\n\n**Response 200** — `SystemAdminResponse`\n\n**Response 404** — system admin not found"
+          }
+        },
+        {
+          "name": "Delete System Admin",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-Dev-API-Key", "value": "{{dev_api_key}}" }
+            ],
+            "url": {
+              "raw": "http://{{base_domain}}:{{dev_port}}/api/system/admin/:id",
+              "protocol": "http",
+              "host": ["{{base_domain}}"],
+              "port": "{{dev_port}}",
+              "path": ["api", "system", "admin", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "System admin UUID" }]
+            },
+            "description": "Deletes a system administrator by UUID.\n\n**Response 204** — no body."
+          }
+        }
+      ]
+    }
+  ]
+}

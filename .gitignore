@@ -1,0 +1,42 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+*.out
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Go test cache
+*.test
+*.prof
+
+# Dependency directories (uncomment if not using modules)
+# vendor/
+
+# IDE
+.codex
+.idea/
+.claude/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Postgres data
+data/
+!data/.gitkeep
+
+# Auto-generated JWT season keys (private keys must never be committed)
+keys/

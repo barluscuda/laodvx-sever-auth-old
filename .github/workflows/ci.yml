@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── 1. Static checks (no services needed) ──────────────────────────────────
+  lint:
+    name: Build & Vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: go build
+        run: go build ./internal/... ./cmd/...
+
+      - name: go vet
+        run: go vet ./internal/... ./cmd/...
+
+  # ── 2. Integration tests (real Postgres + Redis) ───────────────────────────
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dx_auth_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dx_auth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run integration tests
+        env:
+          TEST_DB_HOST: localhost
+          TEST_DB_PORT: 5432
+          TEST_DB_USER: postgres
+          TEST_DB_PASSWORD: postgres
+          TEST_DB_NAME: dx_auth_test
+          TEST_REDIS_HOST: localhost
+          TEST_REDIS_PORT: 6379
+        run: |
+          go test -v -race -count=1 -timeout=120s ./tests/integration/...

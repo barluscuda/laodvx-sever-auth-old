@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/barluscuda/laodvx-server-auth/config"
@@ -17,23 +18,26 @@ import (
 )
 
 type tenantUserService struct {
-	repo         ports.TenantUserRepository
-	pendingStore ports.PendingRegistrationStore
-	emailSender  ports.EmailSender
-	emailCfg     config.EmailConfig
+	repo            ports.TenantUserRepository
+	pendingStore    ports.PendingRegistrationStore
+	registerAttempt ports.RegistrationAttemptRepository
+	emailSender     ports.EmailSender
+	emailCfg        config.EmailConfig
 }
 
 func NewTenantUserService(
 	repo ports.TenantUserRepository,
 	pendingStore ports.PendingRegistrationStore,
+	registerAttempt ports.RegistrationAttemptRepository,
 	emailSender ports.EmailSender,
 	emailCfg config.EmailConfig,
 ) ports.TenantUserService {
 	return &tenantUserService{
-		repo:         repo,
-		pendingStore: pendingStore,
-		emailSender:  emailSender,
-		emailCfg:     emailCfg,
+		repo:            repo,
+		pendingStore:    pendingStore,
+		registerAttempt: registerAttempt,
+		emailSender:     emailSender,
+		emailCfg:        emailCfg,
 	}
 }
 
@@ -41,6 +45,14 @@ func NewTenantUserService(
 // sends an OTP email. The user is NOT written to the database until VerifyEmail
 // succeeds.
 func (s *tenantUserService) Create(tenantID uuid.UUID, email, password string) error {
+	// Honour an active verify-lockout on this email — a registration is
+	// locked for OTPVerifyLockoutTTL after OTPMaxVerifyAttempts bad OTPs.
+	if locked, retryAfter, err := s.registerAttempt.IsLocked(registerLockKey(tenantID, email)); err != nil {
+		return err
+	} else if locked {
+		return &ports.AccountLockedError{RetryAfter: retryAfter}
+	}
+
 	// Existence checks first — bcrypt is expensive, so never run it on a
 	// request that we are going to reject anyway (DoS hardening) and so the
 	// response time does not leak whether the email is registered.
@@ -92,33 +104,35 @@ func (s *tenantUserService) Create(tenantID uuid.UUID, email, password string) e
 }
 
 // VerifyEmail validates the OTP against the pending registration, creates the
-// user in the database, and removes the pending entry from cache.
+// user in the database, and removes the pending entry from cache. After
+// OTPMaxVerifyAttempts wrong guesses the email is locked for
+// OTPVerifyLockoutTTL via the registration-attempt store.
 func (s *tenantUserService) VerifyEmail(tenantID uuid.UUID, email, otp string) error {
+	lockKey := registerLockKey(tenantID, email)
+
+	if locked, retryAfter, err := s.registerAttempt.IsLocked(lockKey); err != nil {
+		return err
+	} else if locked {
+		return &ports.AccountLockedError{RetryAfter: retryAfter}
+	}
+
 	reg, err := s.pendingStore.Get(tenantID, email)
 	if err != nil {
+		// Count misses against unknown/expired pendings too so an attacker
+		// cannot probe indefinitely once the pending entry TTL elapses.
+		_ = s.registerAttempt.Record(lockKey)
 		return ports.ErrVerificationTokenInvalid
 	}
 
 	if time.Now().After(reg.ExpiresAt) {
 		s.pendingStore.Delete(tenantID, email) //nolint:errcheck
-		return ports.ErrVerificationTokenInvalid
-	}
-
-	// Brute-force guard: invalidate the pending registration once the
-	// verification-attempt budget is spent. The user must re-register to get
-	// a fresh OTP, which resets the counter.
-	if s.emailCfg.OTPMaxVerifyAttempts > 0 && reg.VerifyAttempts >= s.emailCfg.OTPMaxVerifyAttempts {
-		s.pendingStore.Delete(tenantID, email) //nolint:errcheck
+		_ = s.registerAttempt.Record(lockKey)
 		return ports.ErrVerificationTokenInvalid
 	}
 
 	if subtle.ConstantTimeCompare([]byte(reg.OTP), []byte(otp)) != 1 {
-		reg.VerifyAttempts++
-		// Preserve remaining TTL so an attacker cannot extend the window by
-		// spamming wrong guesses. Ignore the Set error — the worst case is
-		// the counter fails to persist and the next attempt retries.
-		if ttl := time.Until(reg.ExpiresAt); ttl > 0 {
-			_ = s.pendingStore.Set(reg, ttl)
+		if err := s.registerAttempt.Record(lockKey); err != nil {
+			return err
 		}
 		return ports.ErrVerificationTokenInvalid
 	}
@@ -132,7 +146,8 @@ func (s *tenantUserService) VerifyEmail(tenantID uuid.UUID, email, otp string) e
 		return err
 	}
 
-	s.pendingStore.Delete(tenantID, email) //nolint:errcheck
+	s.pendingStore.Delete(tenantID, email)  //nolint:errcheck
+	_ = s.registerAttempt.Reset(lockKey)
 	return nil
 }
 
@@ -141,6 +156,12 @@ func (s *tenantUserService) VerifyEmail(tenantID uuid.UUID, email, otp string) e
 // enumerating registered accounts, but enforces per-email OTP rate limits
 // (cooldown + max issues) to prevent mailbox flooding.
 func (s *tenantUserService) ResendVerification(tenantID uuid.UUID, email string) error {
+	if locked, retryAfter, err := s.registerAttempt.IsLocked(registerLockKey(tenantID, email)); err != nil {
+		return err
+	} else if locked {
+		return &ports.AccountLockedError{RetryAfter: retryAfter}
+	}
+
 	reg, err := s.pendingStore.Get(tenantID, email)
 	if err != nil {
 		// Unknown email or already verified — silent no-op.
@@ -176,6 +197,13 @@ func (s *tenantUserService) GetByID(tenantID uuid.UUID, id uuid.UUID) (*model.Te
 
 func (s *tenantUserService) GetByEmail(tenantID uuid.UUID, email string) (*model.TenantUser, error) {
 	return s.repo.GetByEmail(tenantID, email)
+}
+
+// registerLockKey is the per-(tenant,email) key used by the registration
+// verify-lockout store. Kept in sync with pending-registration keying so
+// the same normalised email identifies both records.
+func registerLockKey(tenantID uuid.UUID, email string) string {
+	return fmt.Sprintf("%s:%s", tenantID, strings.ToLower(strings.TrimSpace(email)))
 }
 
 // generateOTP returns a cryptographically random 6-digit numeric string.

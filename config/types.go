@@ -162,6 +162,10 @@ type EmailConfig struct {
 	OTPResendCooldown time.Duration
 
 	// EMAIL_OTP_MAX_VERIFY_ATTEMPTS — Maximum OTP-verification attempts before
-	// the pending registration is invalidated. Default: 5.
+	// the email is locked out of registration. Default: 5.
 	OTPMaxVerifyAttempts int
+
+	// EMAIL_OTP_VERIFY_LOCKOUT_SECONDS — Duration an email is locked out of
+	// registration after exceeding OTPMaxVerifyAttempts. Default: 900 (15 min).
+	OTPVerifyLockoutTTL time.Duration
 }

@@ -23,12 +23,13 @@ type Deps struct {
 	RefreshToken        ports.RefreshTokenRepository
 	PendingRegistration ports.PendingRegistrationStore
 	LoginAttempt        ports.LoginAttemptRepository
+	RegisterAttempt     ports.RegistrationAttemptRepository
 	EmailSender         ports.EmailSender
 }
 
 func NewServices(d Deps, cfg config.Config) *Services {
 	return &Services{
-		TenantUser:     NewTenantUserService(d.TenantUser, d.PendingRegistration, d.EmailSender, cfg.Email),
+		TenantUser:     NewTenantUserService(d.TenantUser, d.PendingRegistration, d.RegisterAttempt, d.EmailSender, cfg.Email),
 		Tenant:         NewTenantService(d.Tenant),
 		TenantAdmin:    NewTenantAdminService(d.TenantUser),
 		UserAuth:       NewAuthService(d.TenantUser, d.RefreshToken, d.LoginAttempt, cfg.JWT),

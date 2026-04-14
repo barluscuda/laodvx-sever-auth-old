@@ -77,6 +77,7 @@ func Load() {
 				OTPMaxIssues:         getIntEnv("EMAIL_OTP_MAX_ISSUES", 5),
 				OTPResendCooldown:    getDurationEnv("EMAIL_OTP_RESEND_COOLDOWN_SECONDS", 60*time.Second),
 				OTPMaxVerifyAttempts: getIntEnv("EMAIL_OTP_MAX_VERIFY_ATTEMPTS", 5),
+				OTPVerifyLockoutTTL:  getDurationEnv("EMAIL_OTP_VERIFY_LOCKOUT_SECONDS", 15*time.Minute),
 			},
 		}
 	})

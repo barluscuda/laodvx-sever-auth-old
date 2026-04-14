@@ -50,6 +50,7 @@ func buildDeps(db *gorm.DB, rdb *goredis.Client, cfg config.Config, emailSender 
 		RefreshToken:        repository.NewRefreshTokenRepository(db),
 		PendingRegistration: redisstore.NewPendingRegistrationStore(rdb),
 		LoginAttempt:        redisstore.NewLoginAttemptRepository(rdb, cfg.RateLimit),
+		RegisterAttempt:     redisstore.NewRegisterAttemptRepository(rdb, cfg.Email),
 		EmailSender:         emailSender,
 	}
 }

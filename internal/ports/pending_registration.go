@@ -13,9 +13,8 @@ type PendingRegistration struct {
 	Password       string    `json:"password"` // bcrypt hash
 	OTP            string    `json:"otp"`
 	ExpiresAt      time.Time `json:"expires_at"`
-	IssueCount     int       `json:"issue_count"`
-	LastIssuedAt   time.Time `json:"last_issued_at"`
-	VerifyAttempts int       `json:"verify_attempts"`
+	IssueCount   int       `json:"issue_count"`
+	LastIssuedAt time.Time `json:"last_issued_at"`
 }
 
 // PendingRegistrationStore persists and retrieves pending (pre-verification) registrations.

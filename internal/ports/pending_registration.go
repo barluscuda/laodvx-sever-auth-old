@@ -8,11 +8,14 @@ import (
 
 // PendingRegistration holds an unverified registration waiting for OTP confirmation.
 type PendingRegistration struct {
-	TenantID  uuid.UUID `json:"tenant_id"`
-	Email     string    `json:"email"`
-	Password  string    `json:"password"` // bcrypt hash
-	OTP       string    `json:"otp"`
-	ExpiresAt time.Time `json:"expires_at"`
+	TenantID       uuid.UUID `json:"tenant_id"`
+	Email          string    `json:"email"`
+	Password       string    `json:"password"` // bcrypt hash
+	OTP            string    `json:"otp"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	IssueCount     int       `json:"issue_count"`
+	LastIssuedAt   time.Time `json:"last_issued_at"`
+	VerifyAttempts int       `json:"verify_attempts"`
 }
 
 // PendingRegistrationStore persists and retrieves pending (pre-verification) registrations.

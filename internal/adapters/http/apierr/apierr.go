@@ -45,6 +45,8 @@ const (
 	// ── Email verification ───────────────────────────────────────────────────
 	CodeEmailNotVerified         Code = "err_email_not_verified"
 	CodeVerificationTokenInvalid Code = "err_verification_token_invalid"
+	CodeRegistrationPending      Code = "err_registration_pending"
+	CodeOTPRateLimited           Code = "err_otp_rate_limited"
 
 	// ── Resources ────────────────────────────────────────────────────────────
 	CodeNotFound       Code = "err_not_found"
@@ -70,6 +72,8 @@ var defaultMessages = map[Code]string{
 	CodeForbidden:                "You do not have permission to perform this action.",
 	CodeEmailNotVerified:         "Your email address has not been verified. Please check your inbox.",
 	CodeVerificationTokenInvalid: "The verification token is invalid or has expired.",
+	CodeRegistrationPending:      "This email is registered but not yet verified. Please check your inbox or request a new verification code.",
+	CodeOTPRateLimited:           "Too many verification-code requests for this email. Please wait before trying again.",
 	CodeNotFound:                 "The requested resource was not found.",
 	CodeDuplicateEmail:           "An account with this email address already exists.",
 	CodeInternal:                 "An unexpected error occurred. Please try again later.",

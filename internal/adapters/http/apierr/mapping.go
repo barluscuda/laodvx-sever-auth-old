@@ -33,6 +33,10 @@ func classify(err error) (int, Code) {
 		return http.StatusNotFound, CodeNotFound
 	case errors.Is(err, ports.ErrDuplicateEmail):
 		return http.StatusConflict, CodeDuplicateEmail
+	case errors.Is(err, ports.ErrRegistrationPending):
+		return http.StatusConflict, CodeRegistrationPending
+	case errors.Is(err, ports.ErrOTPRateLimited):
+		return http.StatusTooManyRequests, CodeOTPRateLimited
 	case errors.Is(err, ports.ErrInvalidCredentials):
 		return http.StatusUnauthorized, CodeInvalidCredentials
 	case errors.Is(err, ports.ErrEmailNotVerified):

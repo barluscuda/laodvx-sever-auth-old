@@ -14,6 +14,8 @@ var (
 	ErrTokenExpired             = errors.New("token expired")
 	ErrDuplicateEmail           = errors.New("email already registered")
 	ErrEmailNotVerified         = errors.New("email not verified")
+	ErrRegistrationPending      = errors.New("registration pending email verification")
+	ErrOTPRateLimited           = errors.New("otp request rate limit exceeded")
 	ErrVerificationTokenInvalid = errors.New("verification token is invalid or expired")
 )
 

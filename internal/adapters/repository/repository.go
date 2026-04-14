@@ -1,34 +1,13 @@
 package repository
 
-import (
-	"time"
+import "github.com/barluscuda/laodvx-server-auth/internal/ports"
 
-	"github.com/barluscuda/laodvx-server-auth/config"
-	"github.com/barluscuda/laodvx-server-auth/internal/ports"
-
-	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
-)
-
+// Repository bundles the DB-backed repositories. Redis-native stores and
+// cache wrappers are composed by the caller (see cmd/server).
 type Repository struct {
-	Tenant              ports.TenantRepository
-	TenantUser          ports.TenantUserRepository
-	SystemUser          ports.SystemUserRepository
-	PendingRegistration ports.PendingRegistrationStore
-	SystemAdmin         ports.SystemAdminRepository
-	RefreshToken        ports.RefreshTokenRepository
-	LoginAttempt        ports.LoginAttemptRepository
-}
-
-func New(db *gorm.DB, rdb *redis.Client, cacheTTL time.Duration, rateLimitCfg config.RateLimitConfig) *Repository {
-	tenantUserRepo := NewCachedTenantUserRepository(NewTenantUserRepository(db), rdb, cacheTTL)
-	return &Repository{
-		Tenant:              NewCachedTenantRepository(NewTenantRepository(db), rdb, cacheTTL),
-		TenantUser:          tenantUserRepo,
-		SystemUser:          tenantUserRepo,
-		PendingRegistration: NewPendingRegistrationStore(rdb),
-		SystemAdmin:         NewSystemAdminRepository(db),
-		RefreshToken:        NewRefreshTokenRepository(db),
-		LoginAttempt:        NewLoginAttemptRepository(rdb, rateLimitCfg),
-	}
+	Tenant       ports.TenantRepository
+	TenantUser   ports.TenantUserRepository
+	SystemUser   ports.SystemUserRepository
+	SystemAdmin  ports.SystemAdminRepository
+	RefreshToken ports.RefreshTokenRepository
 }

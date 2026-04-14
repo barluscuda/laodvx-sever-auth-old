@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"math/big"
@@ -40,21 +41,26 @@ func NewTenantUserService(
 // sends an OTP email. The user is NOT written to the database until VerifyEmail
 // succeeds.
 func (s *tenantUserService) Create(tenantID uuid.UUID, email, password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
-	if err != nil {
-		return err
-	}
-
-	// Reject if a verified user already exists in the database.
+	// Existence checks first — bcrypt is expensive, so never run it on a
+	// request that we are going to reject anyway (DoS hardening) and so the
+	// response time does not leak whether the email is registered.
 	if _, err := s.repo.GetByEmail(tenantID, email); err == nil {
 		return ports.ErrDuplicateEmail
 	} else if !errors.Is(err, ports.ErrNotFound) {
 		return err
 	}
 
-	// Reject if a pending (unverified) registration already exists in cache.
+	// A pending registration means the user signed up but has not yet
+	// verified their email. Surface a distinct error so the UI can prompt
+	// them to check their inbox or resend the OTP instead of showing a
+	// generic "already registered" message.
 	if _, err := s.pendingStore.Get(tenantID, email); err == nil {
-		return ports.ErrDuplicateEmail
+		return ports.ErrRegistrationPending
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return err
 	}
 
 	otp, err := generateOTP()
@@ -62,12 +68,15 @@ func (s *tenantUserService) Create(tenantID uuid.UUID, email, password string) e
 		return err
 	}
 
+	now := time.Now()
 	reg := &ports.PendingRegistration{
-		TenantID:  tenantID,
-		Email:     email,
-		Password:  string(hash),
-		OTP:       otp,
-		ExpiresAt: time.Now().Add(s.emailCfg.OTPExpiry),
+		TenantID:     tenantID,
+		Email:        email,
+		Password:     string(hash),
+		OTP:          otp,
+		ExpiresAt:    now.Add(s.emailCfg.OTPExpiry),
+		IssueCount:   1,
+		LastIssuedAt: now,
 	}
 	if err := s.pendingStore.Set(reg, s.emailCfg.OTPExpiry); err != nil {
 		return err
@@ -95,7 +104,22 @@ func (s *tenantUserService) VerifyEmail(tenantID uuid.UUID, email, otp string) e
 		return ports.ErrVerificationTokenInvalid
 	}
 
-	if reg.OTP != otp {
+	// Brute-force guard: invalidate the pending registration once the
+	// verification-attempt budget is spent. The user must re-register to get
+	// a fresh OTP, which resets the counter.
+	if s.emailCfg.OTPMaxVerifyAttempts > 0 && reg.VerifyAttempts >= s.emailCfg.OTPMaxVerifyAttempts {
+		s.pendingStore.Delete(tenantID, email) //nolint:errcheck
+		return ports.ErrVerificationTokenInvalid
+	}
+
+	if subtle.ConstantTimeCompare([]byte(reg.OTP), []byte(otp)) != 1 {
+		reg.VerifyAttempts++
+		// Preserve remaining TTL so an attacker cannot extend the window by
+		// spamming wrong guesses. Ignore the Set error — the worst case is
+		// the counter fails to persist and the next attempt retries.
+		if ttl := time.Until(reg.ExpiresAt); ttl > 0 {
+			_ = s.pendingStore.Set(reg, ttl)
+		}
 		return ports.ErrVerificationTokenInvalid
 	}
 
@@ -113,8 +137,9 @@ func (s *tenantUserService) VerifyEmail(tenantID uuid.UUID, email, otp string) e
 }
 
 // ResendVerification generates a new OTP for an existing pending registration
-// and resends the verification email. Always returns nil to avoid enumerating
-// registered emails.
+// and resends the verification email. Returns nil for unknown emails to avoid
+// enumerating registered accounts, but enforces per-email OTP rate limits
+// (cooldown + max issues) to prevent mailbox flooding.
 func (s *tenantUserService) ResendVerification(tenantID uuid.UUID, email string) error {
 	reg, err := s.pendingStore.Get(tenantID, email)
 	if err != nil {
@@ -122,12 +147,23 @@ func (s *tenantUserService) ResendVerification(tenantID uuid.UUID, email string)
 		return nil
 	}
 
+	now := time.Now()
+	if s.emailCfg.OTPResendCooldown > 0 &&
+		now.Sub(reg.LastIssuedAt) < s.emailCfg.OTPResendCooldown {
+		return ports.ErrOTPRateLimited
+	}
+	if s.emailCfg.OTPMaxIssues > 0 && reg.IssueCount >= s.emailCfg.OTPMaxIssues {
+		return ports.ErrOTPRateLimited
+	}
+
 	otp, err := generateOTP()
 	if err != nil {
 		return err
 	}
 	reg.OTP = otp
-	reg.ExpiresAt = time.Now().Add(s.emailCfg.OTPExpiry)
+	reg.ExpiresAt = now.Add(s.emailCfg.OTPExpiry)
+	reg.LastIssuedAt = now
+	reg.IssueCount++
 	if err := s.pendingStore.Set(reg, s.emailCfg.OTPExpiry); err != nil {
 		return err
 	}

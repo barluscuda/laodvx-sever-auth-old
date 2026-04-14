@@ -1,4 +1,4 @@
-package repository
+package redisstore
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/barluscuda/laodvx-server-auth/config"
 	"github.com/barluscuda/laodvx-server-auth/internal/ports"
+
 	"github.com/redis/go-redis/v9"
 )
 
@@ -39,7 +40,6 @@ func (r *loginAttemptRepository) IsLocked(key string) (bool, time.Duration, erro
 		return false, 0, nil
 	}
 
-	// Account is locked — fetch the remaining TTL from Redis.
 	ttl, err := r.rdb.TTL(ctx, rkey).Result()
 	if err != nil || ttl <= 0 {
 		ttl = r.lockoutTTL
@@ -55,7 +55,6 @@ func (r *loginAttemptRepository) Record(key string) error {
 	if err != nil {
 		return err
 	}
-	// Set the TTL only on the first increment so the window starts then.
 	if count == 1 {
 		if err := r.rdb.Expire(ctx, rkey, r.lockoutTTL).Err(); err != nil {
 			return err

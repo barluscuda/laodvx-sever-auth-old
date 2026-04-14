@@ -8,16 +8,25 @@ import (
 )
 
 type systemAdminService struct {
-	repo       ports.SystemUserRepository
-	tenantRepo ports.TenantRepository
+	systemUserRepo ports.SystemUserRepository
+	tenantUserRepo ports.TenantUserRepository
+	tenantRepo     ports.TenantRepository
 }
 
-func NewSystemAdminService(repo ports.SystemUserRepository, tenantRepo ports.TenantRepository) ports.SystemAdminService {
-	return &systemAdminService{repo: repo, tenantRepo: tenantRepo}
+func NewSystemAdminService(
+	systemUserRepo ports.SystemUserRepository,
+	tenantUserRepo ports.TenantUserRepository,
+	tenantRepo ports.TenantRepository,
+) ports.SystemAdminService {
+	return &systemAdminService{
+		systemUserRepo: systemUserRepo,
+		tenantUserRepo: tenantUserRepo,
+		tenantRepo:     tenantRepo,
+	}
 }
 
 func (s *systemAdminService) GetAll() ([]model.TenantUser, error) {
-	return s.repo.SystemGetAll()
+	return s.systemUserRepo.SystemGetAll()
 }
 
 func (s *systemAdminService) GetAllByTenantName(tenantName string) ([]model.TenantUser, error) {
@@ -25,11 +34,11 @@ func (s *systemAdminService) GetAllByTenantName(tenantName string) ([]model.Tena
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetAll(t.UUID)
+	return s.tenantUserRepo.GetAll(t.UUID)
 }
 
 func (s *systemAdminService) GetAllByEmail(email string) ([]model.TenantUser, error) {
-	return s.repo.SystemGetAllByEmail(email)
+	return s.systemUserRepo.SystemGetAllByEmail(email)
 }
 
 func (s *systemAdminService) GetByTenantAndEmail(tenantName string, email string) (*model.TenantUser, error) {
@@ -37,11 +46,11 @@ func (s *systemAdminService) GetByTenantAndEmail(tenantName string, email string
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetByEmail(t.UUID, email)
+	return s.tenantUserRepo.GetByEmail(t.UUID, email)
 }
 
 func (s *systemAdminService) GetByID(id uuid.UUID) (*model.TenantUser, error) {
-	return s.repo.SystemGetByID(id)
+	return s.systemUserRepo.SystemGetByID(id)
 }
 
 func (s *systemAdminService) SetTenantAdmin(tenantName string, userID uuid.UUID) error {
@@ -49,9 +58,8 @@ func (s *systemAdminService) SetTenantAdmin(tenantName string, userID uuid.UUID)
 	if err != nil {
 		return err
 	}
-	// Verify the user belongs to the specified tenant before promoting.
-	if _, err := s.repo.GetByID(t.UUID, userID); err != nil {
+	if _, err := s.tenantUserRepo.GetByID(t.UUID, userID); err != nil {
 		return err
 	}
-	return s.repo.SystemSetRole(userID, ports.RoleTenantAdmin)
+	return s.systemUserRepo.SystemSetRole(userID, ports.RoleTenantAdmin)
 }

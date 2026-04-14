@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"errors"
 	"time"
 
 	"github.com/barluscuda/laodvx-server-auth/internal/domain/model"
@@ -26,10 +25,7 @@ func (r *refreshTokenRepository) Create(rt *model.RefreshToken) error {
 
 func (r *refreshTokenRepository) GetByTID(tid uuid.UUID) (*model.RefreshToken, error) {
 	var rt model.RefreshToken
-	if err := r.db.First(&rt, "tid = ?", tid).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ports.ErrNotFound
-		}
+	if err := firstOrNotFound(r.db, &rt, "tid = ?", tid); err != nil {
 		return nil, err
 	}
 	return &rt, nil
@@ -41,7 +37,7 @@ func (r *refreshTokenRepository) MarkUsed(tid uuid.UUID, usedAt time.Time) error
 
 func (r *refreshTokenRepository) ClaimToken(tid uuid.UUID) (*model.RefreshToken, error) {
 	now := time.Now()
-	rt := model.RefreshToken{}
+	var rt model.RefreshToken
 	result := r.db.Model(&rt).
 		Clauses(clause.Returning{}).
 		Where("tid = ? AND used_at IS NULL AND expires_at > ?", tid, now).
@@ -49,18 +45,19 @@ func (r *refreshTokenRepository) ClaimToken(tid uuid.UUID) (*model.RefreshToken,
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	if result.RowsAffected == 0 {
-		// Could be already used, expired, or not found — all treated as invalid
-		if err := r.db.First(&rt, "tid = ?", tid).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, ports.ErrNotFound
-			}
-			return nil, err
-		}
-		if rt.UsedAt != nil {
-			return nil, ports.ErrTokenAlreadyUsed
-		}
-		return nil, ports.ErrTokenExpired
+	if result.RowsAffected > 0 {
+		return &rt, nil
 	}
-	return &rt, nil
+	return nil, r.claimFailureReason(tid)
+}
+
+func (r *refreshTokenRepository) claimFailureReason(tid uuid.UUID) error {
+	var rt model.RefreshToken
+	if err := firstOrNotFound(r.db, &rt, "tid = ?", tid); err != nil {
+		return err
+	}
+	if rt.UsedAt != nil {
+		return ports.ErrTokenAlreadyUsed
+	}
+	return ports.ErrTokenExpired
 }

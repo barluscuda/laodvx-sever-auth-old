@@ -6,9 +6,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// SystemUserRepository extends TenantUserRepository with system-wide (cross-tenant) operations.
+// SystemUserRepository exposes cross-tenant operations over users.
+// Tenant-scoped CRUD lives in TenantUserRepository.
 type SystemUserRepository interface {
-	TenantUserRepository
 	SystemGetAll() ([]model.TenantUser, error)
 	SystemGetAllByEmail(email string) ([]model.TenantUser, error)
 	SystemGetByID(id uuid.UUID) (*model.TenantUser, error)

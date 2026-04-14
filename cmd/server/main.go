@@ -2,16 +2,20 @@ package main
 
 import (
 	"github.com/barluscuda/laodvx-server-auth/config"
+	"github.com/barluscuda/laodvx-server-auth/internal/adapters/cache"
+	"github.com/barluscuda/laodvx-server-auth/internal/adapters/cachedrepo"
 	"github.com/barluscuda/laodvx-server-auth/internal/adapters/database"
 	emailadapter "github.com/barluscuda/laodvx-server-auth/internal/adapters/email"
 	httphandler "github.com/barluscuda/laodvx-server-auth/internal/adapters/http/handler"
 	"github.com/barluscuda/laodvx-server-auth/internal/adapters/redis"
+	"github.com/barluscuda/laodvx-server-auth/internal/adapters/redisstore"
 	"github.com/barluscuda/laodvx-server-auth/internal/adapters/repository"
 	"github.com/barluscuda/laodvx-server-auth/internal/domain/model"
 	svc "github.com/barluscuda/laodvx-server-auth/internal/domain/service"
 	"github.com/barluscuda/laodvx-server-auth/internal/ports"
 	"github.com/barluscuda/laodvx-server-auth/internal/server"
 
+	goredis "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -21,10 +25,33 @@ func main() {
 	db := database.Connect(cfg.Database)
 	autoMigrate(db)
 
-	repos := repository.New(db, redis.Connect(cfg.Redis), cfg.Redis.CacheTTL, cfg.RateLimit)
-	services := svc.NewServices(repos, cfg, newEmailSender(cfg))
+	rdb := redis.Connect(cfg.Redis)
 
-	server.New(cfg, repos.Tenant, newHandlers(services)).Run()
+	deps := buildDeps(db, rdb, cfg, newEmailSender(cfg))
+	services := svc.NewServices(deps, cfg)
+
+	server.New(cfg, deps.Tenant, newHandlers(services)).Run()
+}
+
+func buildDeps(db *gorm.DB, rdb *goredis.Client, cfg config.Config, emailSender ports.EmailSender) svc.Deps {
+	ttl := cfg.Redis.CacheTTL
+
+	tenantRepo := repository.NewTenantRepository(db)
+	tenantUserRepo := repository.NewTenantUserRepository(db)
+
+	tenantCache := cache.NewTenantCache(rdb, ttl)
+	tenantUserCache := cache.NewTenantUserCache(rdb, ttl)
+
+	return svc.Deps{
+		Tenant:              cachedrepo.NewTenant(tenantRepo, tenantCache),
+		TenantUser:          cachedrepo.NewTenantUser(tenantUserRepo, tenantUserCache),
+		SystemUser:          repository.NewSystemGlobalUserRepository(db),
+		SystemAdmin:         repository.NewSystemAdminRepository(db),
+		RefreshToken:        repository.NewRefreshTokenRepository(db),
+		PendingRegistration: redisstore.NewPendingRegistrationStore(rdb),
+		LoginAttempt:        redisstore.NewLoginAttemptRepository(rdb, cfg.RateLimit),
+		EmailSender:         emailSender,
+	}
 }
 
 func autoMigrate(db *gorm.DB) {

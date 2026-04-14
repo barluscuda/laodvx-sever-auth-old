@@ -152,4 +152,16 @@ type EmailConfig struct {
 	// EMAIL_OTP_EXPIRY_SECONDS — How long a registration OTP remains valid (seconds).
 	// Default: 600 (10 min).
 	OTPExpiry time.Duration
+
+	// EMAIL_OTP_MAX_ISSUES — Maximum number of OTPs that can be issued for a
+	// single pending registration (initial send + resends). Default: 5.
+	OTPMaxIssues int
+
+	// EMAIL_OTP_RESEND_COOLDOWN_SECONDS — Minimum time between two OTP issues
+	// for the same email. Default: 60.
+	OTPResendCooldown time.Duration
+
+	// EMAIL_OTP_MAX_VERIFY_ATTEMPTS — Maximum OTP-verification attempts before
+	// the pending registration is invalidated. Default: 5.
+	OTPMaxVerifyAttempts int
 }

@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"errors"
-
 	"github.com/barluscuda/laodvx-server-auth/internal/domain/model"
 	"github.com/barluscuda/laodvx-server-auth/internal/ports"
 
@@ -32,10 +30,7 @@ func (r *systemAdminRepository) GetAll() ([]model.SystemAdmin, error) {
 
 func (r *systemAdminRepository) GetByUsername(username string) (*model.SystemAdmin, error) {
 	var u model.SystemAdmin
-	if err := r.db.First(&u, "username = ?", username).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ports.ErrNotFound
-		}
+	if err := firstOrNotFound(r.db, &u, "username = ?", username); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -43,22 +38,12 @@ func (r *systemAdminRepository) GetByUsername(username string) (*model.SystemAdm
 
 func (r *systemAdminRepository) GetByID(id uuid.UUID) (*model.SystemAdmin, error) {
 	var u model.SystemAdmin
-	if err := r.db.First(&u, "uuid = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ports.ErrNotFound
-		}
+	if err := firstOrNotFound(r.db, &u, "uuid = ?", id); err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
 func (r *systemAdminRepository) Delete(id uuid.UUID) error {
-	result := r.db.Where("uuid = ?", id).Delete(&model.SystemAdmin{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ports.ErrNotFound
-	}
-	return nil
+	return requireAffected(r.db.Where("uuid = ?", id).Delete(&model.SystemAdmin{}))
 }

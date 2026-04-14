@@ -2,7 +2,6 @@ package service
 
 import (
 	"github.com/barluscuda/laodvx-server-auth/config"
-	"github.com/barluscuda/laodvx-server-auth/internal/adapters/repository"
 	"github.com/barluscuda/laodvx-server-auth/internal/ports"
 )
 
@@ -16,14 +15,25 @@ type Services struct {
 	DevSystemAdmin ports.DevSystemAdminService
 }
 
-func NewServices(repos *repository.Repository, cfg config.Config, emailSender ports.EmailSender) *Services {
+type Deps struct {
+	Tenant              ports.TenantRepository
+	TenantUser          ports.TenantUserRepository
+	SystemUser          ports.SystemUserRepository
+	SystemAdmin         ports.SystemAdminRepository
+	RefreshToken        ports.RefreshTokenRepository
+	PendingRegistration ports.PendingRegistrationStore
+	LoginAttempt        ports.LoginAttemptRepository
+	EmailSender         ports.EmailSender
+}
+
+func NewServices(d Deps, cfg config.Config) *Services {
 	return &Services{
-		TenantUser:     NewTenantUserService(repos.TenantUser, repos.PendingRegistration, emailSender, cfg.Email),
-		Tenant:         NewTenantService(repos.Tenant),
-		TenantAdmin:    NewTenantAdminService(repos.TenantUser),
-		UserAuth:       NewAuthService(repos.TenantUser, repos.RefreshToken, repos.LoginAttempt, cfg.JWT),
-		SystemAdmin:    NewSystemAdminService(repos.SystemUser, repos.Tenant),
-		SystemAuth:     NewSystemAuthService(repos.SystemAdmin, repos.RefreshToken, repos.LoginAttempt, cfg.JWT),
-		DevSystemAdmin: NewDevSystemAdminService(repos.SystemAdmin),
+		TenantUser:     NewTenantUserService(d.TenantUser, d.PendingRegistration, d.EmailSender, cfg.Email),
+		Tenant:         NewTenantService(d.Tenant),
+		TenantAdmin:    NewTenantAdminService(d.TenantUser),
+		UserAuth:       NewAuthService(d.TenantUser, d.RefreshToken, d.LoginAttempt, cfg.JWT),
+		SystemAdmin:    NewSystemAdminService(d.SystemUser, d.TenantUser, d.Tenant),
+		SystemAuth:     NewSystemAuthService(d.SystemAdmin, d.RefreshToken, d.LoginAttempt, cfg.JWT),
+		DevSystemAdmin: NewDevSystemAdminService(d.SystemAdmin),
 	}
 }

@@ -73,7 +73,10 @@ func Load() {
 				SMTPUsername: getEnv("EMAIL_SMTP_USERNAME", ""),
 				SMTPPassword: getEnv("EMAIL_SMTP_PASSWORD", ""),
 				FromAddress:  getEnv("EMAIL_FROM_ADDRESS", "no-reply@example.com"),
-				OTPExpiry:    getDurationEnv("EMAIL_OTP_EXPIRY_SECONDS", 10*time.Minute),
+				OTPExpiry:            getDurationEnv("EMAIL_OTP_EXPIRY_SECONDS", 10*time.Minute),
+				OTPMaxIssues:         getIntEnv("EMAIL_OTP_MAX_ISSUES", 5),
+				OTPResendCooldown:    getDurationEnv("EMAIL_OTP_RESEND_COOLDOWN_SECONDS", 60*time.Second),
+				OTPMaxVerifyAttempts: getIntEnv("EMAIL_OTP_MAX_VERIFY_ATTEMPTS", 5),
 			},
 		}
 	})

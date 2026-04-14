@@ -73,7 +73,13 @@ func (s *tenantUserService) Create(tenantID uuid.UUID, email, password string) e
 		return err
 	}
 
-	return s.emailSender.SendVerificationEmail(email, otp)
+	if err := s.emailSender.SendVerificationEmail(email, otp); err != nil {
+		// Roll back the pending reg so the user can retry without hitting
+		// ErrDuplicateEmail on the pending-store check.
+		_ = s.pendingStore.Delete(tenantID, email)
+		return err
+	}
+	return nil
 }
 
 // VerifyEmail validates the OTP against the pending registration, creates the

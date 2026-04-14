@@ -31,13 +31,13 @@ const (
 	CodeInvalidRequest  Code = "err_invalid_request"
 
 	// ── Authentication ───────────────────────────────────────────────────────
-	CodeMissingAuth         Code = "err_missing_auth"
-	CodeInvalidCredentials  Code = "err_invalid_credentials"
-	CodeAccountLocked       Code = "err_account_locked"
-	CodeTokenInvalid        Code = "err_token_invalid"
-	CodeTokenExpired        Code = "err_token_expired"
-	CodeTokenAlreadyUsed    Code = "err_token_used"
-	CodeInvalidTokenClaims  Code = "err_invalid_token_claims"
+	CodeMissingAuth        Code = "err_missing_auth"
+	CodeInvalidCredentials Code = "err_invalid_credentials"
+	CodeAccountLocked      Code = "err_account_locked"
+	CodeTokenInvalid       Code = "err_token_invalid"
+	CodeTokenExpired       Code = "err_token_expired"
+	CodeTokenAlreadyUsed   Code = "err_token_used"
+	CodeInvalidTokenClaims Code = "err_invalid_token_claims"
 
 	// ── Authorisation ────────────────────────────────────────────────────────
 	CodeForbidden Code = "err_forbidden"
@@ -57,22 +57,22 @@ const (
 // defaultMessages provides English fallback text for each code.
 // Frontends should key off the "error" field and supply their own copy.
 var defaultMessages = map[Code]string{
-	CodeInvalidTenantID:    "The provided tenant ID is not a valid UUID.",
-	CodeInvalidID:          "The provided ID is not a valid UUID.",
-	CodeInvalidRequest:     "The request body is missing or contains invalid JSON.",
-	CodeMissingAuth:        "Authorization header is missing. Provide a Bearer token.",
-	CodeInvalidCredentials: "The email or password is incorrect.",
-	CodeAccountLocked:      "This account is temporarily locked due to too many failed login attempts. Please try again later.",
-	CodeTokenInvalid:       "The token is invalid or has been tampered with.",
-	CodeTokenExpired:       "The token has expired. Please log in again.",
-	CodeTokenAlreadyUsed:   "This refresh token has already been used. Please log in again.",
-	CodeInvalidTokenClaims: "The token contains invalid claims.",
+	CodeInvalidTenantID:          "The provided tenant ID is not a valid UUID.",
+	CodeInvalidID:                "The provided ID is not a valid UUID.",
+	CodeInvalidRequest:           "The request body is missing or contains invalid JSON.",
+	CodeMissingAuth:              "Authorization header is missing. Provide a Bearer token.",
+	CodeInvalidCredentials:       "The email or password is incorrect.",
+	CodeAccountLocked:            "This account is temporarily locked due to too many failed login attempts. Please try again later.",
+	CodeTokenInvalid:             "The token is invalid or has been tampered with.",
+	CodeTokenExpired:             "The token has expired. Please log in again.",
+	CodeTokenAlreadyUsed:         "This refresh token has already been used. Please log in again.",
+	CodeInvalidTokenClaims:       "The token contains invalid claims.",
 	CodeForbidden:                "You do not have permission to perform this action.",
 	CodeEmailNotVerified:         "Your email address has not been verified. Please check your inbox.",
 	CodeVerificationTokenInvalid: "The verification token is invalid or has expired.",
 	CodeNotFound:                 "The requested resource was not found.",
-	CodeDuplicateEmail:     "An account with this email address already exists.",
-	CodeInternal:           "An unexpected error occurred. Please try again later.",
+	CodeDuplicateEmail:           "An account with this email address already exists.",
+	CodeInternal:                 "An unexpected error occurred. Please try again later.",
 }
 
 type response struct {

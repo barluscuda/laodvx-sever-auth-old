@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 type CreateTenantRequest struct {
 	TenantName string `json:"tenant_name" binding:"required,min=1,max=100,alphanum"`
 	Label      string `json:"label"       binding:"required,min=1,max=255"`

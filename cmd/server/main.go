@@ -11,43 +11,51 @@ import (
 	svc "github.com/barluscuda/laodvx-server-auth/internal/domain/service"
 	"github.com/barluscuda/laodvx-server-auth/internal/ports"
 	"github.com/barluscuda/laodvx-server-auth/internal/server"
+
+	"gorm.io/gorm"
 )
 
 func main() {
 	cfg := config.Get()
 
 	db := database.Connect(cfg.Database)
+	autoMigrate(db)
+
+	repos := repository.New(db, redis.Connect(cfg.Redis), cfg.Redis.CacheTTL, cfg.RateLimit)
+	services := svc.NewServices(repos, cfg, newEmailSender(cfg))
+
+	server.New(cfg, repos.Tenant, newHandlers(services)).Run()
+}
+
+func autoMigrate(db *gorm.DB) {
 	db.AutoMigrate(
 		&model.Tenant{},
 		&model.TenantUser{},
 		&model.SystemAdmin{},
 		&model.RefreshToken{},
 	)
+}
 
-	rdb := redis.Connect(cfg.Redis)
-
-	var emailSender ports.EmailSender
-	if cfg.Email.SMTPHost != "" {
-		emailSender = emailadapter.NewSMTPSender(
-			cfg.Email.SMTPHost,
-			cfg.Email.SMTPPort,
-			cfg.Email.SMTPUsername,
-			cfg.Email.SMTPPassword,
-			cfg.Email.FromAddress,
-		)
-	} else {
-		emailSender = emailadapter.NoopSender{}
+func newEmailSender(cfg config.Config) ports.EmailSender {
+	if cfg.Email.SMTPHost == "" {
+		return emailadapter.NoopSender{}
 	}
+	return emailadapter.NewSMTPSender(
+		cfg.Email.SMTPHost,
+		cfg.Email.SMTPPort,
+		cfg.Email.SMTPUsername,
+		cfg.Email.SMTPPassword,
+		cfg.Email.FromAddress,
+	)
+}
 
-	repos := repository.New(db, rdb, cfg.Redis.CacheTTL, cfg.RateLimit)
-	svcs := svc.NewServices(repos, cfg, emailSender)
-
-	server.New(cfg, repos.Tenant, server.Handlers{
-		TenantUser:     httphandler.NewTenantUserHandler(svcs.TenantUser),
-		Auth:           httphandler.NewAuthHandler(svcs.UserAuth),
-		SystemAdmin:    httphandler.NewSystemAdminHandler(svcs.Tenant, svcs.SystemAdmin),
-		SystemAuth:     httphandler.NewSystemAuthHandler(svcs.SystemAuth),
-		TenantAdmin:    httphandler.NewTenantAdminHandler(svcs.TenantAdmin),
-		DevSystemAdmin: httphandler.NewDevSystemAdminHandler(svcs.DevSystemAdmin),
-	}).Run()
+func newHandlers(s *svc.Services) server.Handlers {
+	return server.Handlers{
+		TenantUser:     httphandler.NewTenantUserHandler(s.TenantUser),
+		Auth:           httphandler.NewAuthHandler(s.UserAuth),
+		SystemAdmin:    httphandler.NewSystemAdminHandler(s.Tenant, s.SystemAdmin),
+		SystemAuth:     httphandler.NewSystemAuthHandler(s.SystemAuth),
+		TenantAdmin:    httphandler.NewTenantAdminHandler(s.TenantAdmin),
+		DevSystemAdmin: httphandler.NewDevSystemAdminHandler(s.DevSystemAdmin),
+	}
 }

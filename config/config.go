@@ -30,11 +30,11 @@ func Load() {
 
 		instance = Config{
 			Server: ServerConfig{
-				Mode:    getEnv("SERVER_MODE", "release"),
-				IP:      getEnv("SERVER_IP", "127.0.0.1"),
-				Port:    getEnv("SERVER_PORT", "3220"),
-				DevIP:   getEnv("SERVER_DEV_IP", "127.0.0.1"),
-				DevPort: getEnv("SERVER_DEV_PORT", "3221"),
+				Mode:        getEnv("SERVER_MODE", "release"),
+				IP:          getEnv("SERVER_IP", "127.0.0.1"),
+				Port:        getEnv("SERVER_PORT", "3220"),
+				DevIP:       getEnv("SERVER_DEV_IP", "127.0.0.1"),
+				DevPort:     getEnv("SERVER_DEV_PORT", "3221"),
 				EnablePprof: getEnv("ENABLE_PPROF", "false") == "true",
 				DevAPIKey:   devAPIKey,
 			},

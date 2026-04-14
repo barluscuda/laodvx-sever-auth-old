@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/barluscuda/laodvx-server-auth/internal/adapters/http/apierr"
@@ -22,52 +21,27 @@ func NewSystemAuthHandler(svc ports.SystemAuthService) *SystemAuthHandler {
 // POST /system/api/auth/login
 func (h *SystemAuthHandler) Login(c *gin.Context) {
 	var req dto.SystemLoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-
 	pair, err := h.svc.Login(req.Username, req.Password)
 	if err != nil {
-		var lockErr *ports.AccountLockedError
-		if errors.As(err, &lockErr) {
-			apierr.JSONLocked(c, lockErr.RetryAfter)
-			return
-		}
-		if !errors.Is(err, ports.ErrInvalidCredentials) {
-			apierr.JSON(c, http.StatusInternalServerError, apierr.CodeInternal)
-			return
-		}
-		apierr.JSON(c, http.StatusUnauthorized, apierr.CodeInvalidCredentials)
+		apierr.FromService(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, dto.TokenResponse{
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
-	})
+	c.JSON(http.StatusOK, dto.ToTokenResponse(pair))
 }
 
 // POST /system/api/auth/refresh
 func (h *SystemAuthHandler) Refresh(c *gin.Context) {
 	var req dto.RefreshRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-
 	pair, err := h.svc.Refresh(req.RefreshToken)
 	if err != nil {
-		if errors.Is(err, ports.ErrTokenAlreadyUsed) {
-			apierr.JSON(c, http.StatusUnauthorized, apierr.CodeTokenAlreadyUsed)
-			return
-		}
-		apierr.JSON(c, http.StatusUnauthorized, apierr.CodeTokenInvalid)
+		apierr.FromService(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, dto.TokenResponse{
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
-	})
+	c.JSON(http.StatusOK, dto.ToTokenResponse(pair))
 }

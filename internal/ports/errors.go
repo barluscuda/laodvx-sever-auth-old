@@ -7,14 +7,14 @@ import (
 )
 
 var (
-	ErrNotFound                  = errors.New("not found")
-	ErrInvalidCredentials        = errors.New("invalid credentials")
-	ErrInvalidToken              = errors.New("invalid token")
-	ErrTokenAlreadyUsed          = errors.New("token already used")
-	ErrTokenExpired              = errors.New("token expired")
-	ErrDuplicateEmail            = errors.New("email already registered")
-	ErrEmailNotVerified          = errors.New("email not verified")
-	ErrVerificationTokenInvalid  = errors.New("verification token is invalid or expired")
+	ErrNotFound                 = errors.New("not found")
+	ErrInvalidCredentials       = errors.New("invalid credentials")
+	ErrInvalidToken             = errors.New("invalid token")
+	ErrTokenAlreadyUsed         = errors.New("token already used")
+	ErrTokenExpired             = errors.New("token expired")
+	ErrDuplicateEmail           = errors.New("email already registered")
+	ErrEmailNotVerified         = errors.New("email not verified")
+	ErrVerificationTokenInvalid = errors.New("verification token is invalid or expired")
 )
 
 // AccountLockedError is returned when a login is rejected because the account

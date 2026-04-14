@@ -11,6 +11,7 @@ import (
 
 // SetupTenantAdminRouter mounts tenant-scoped user-admin routes under /api/admin
 func SetupTenantAdminRouter(r *gin.RouterGroup, cfg config.Config, userHandler *handler.TenantAdminHandler) {
+	r.Use(middleware.RequireTenant())
 	r.Use(middleware.RequireAuth(cfg.JWT.AccessKeys, ports.RoleTenantAdmin))
 
 	u := r.Group("/user")

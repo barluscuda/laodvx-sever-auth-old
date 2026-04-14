@@ -12,6 +12,11 @@ import (
 func SetupAPIRouter(r *gin.RouterGroup, cfg config.Config, userHandler *handler.TenantUserHandler, authHandler *handler.AuthHandler) {
 	r.GET("/ping", handler.Ping)
 
+	// All /api routes require an X-Tenant-Id header (already validated by
+	// EnforceRouteScope + ExtractTenantIDFromHeader upstream). RequireTenant
+	// lets handlers call MustTenantUUID without per-endpoint null checks.
+	r.Use(middleware.RequireTenant())
+
 	// Public: registration
 	r.POST("/user", userHandler.Create)
 

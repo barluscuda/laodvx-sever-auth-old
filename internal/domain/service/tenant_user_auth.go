@@ -63,10 +63,6 @@ func (s *authService) Login(tenantID uuid.UUID, email, password string) (*ports.
 		return nil, ports.ErrInvalidCredentials
 	}
 
-	if !u.EmailVerified {
-		return nil, ports.ErrEmailNotVerified
-	}
-
 	if err := s.attemptRepo.Reset(key); err != nil {
 		return nil, err
 	}

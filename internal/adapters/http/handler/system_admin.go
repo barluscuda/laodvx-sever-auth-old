@@ -29,7 +29,7 @@ func (h *SystemAdminHandler) Create(c *gin.Context) {
 		return
 	}
 
-	t, err := h.svc.Create(req.Name)
+	t, err := h.svc.Create(req.TenantName, req.Label, req.Plan)
 	if err != nil {
 		apierr.JSON(c, http.StatusInternalServerError, apierr.CodeInternal)
 		return
@@ -49,15 +49,11 @@ func (h *SystemAdminHandler) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.ToTenantResponseList(tenants))
 }
 
-// GET /system/api/tenant/:id
+// GET /system/api/tenant/:tenantname
 func (h *SystemAdminHandler) GetByID(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidID)
-		return
-	}
+	tenantName := c.Param("tenantname")
 
-	t, err := h.svc.GetByID(id)
+	t, err := h.svc.GetByTenantName(tenantName)
 	if err != nil {
 		if errors.Is(err, ports.ErrNotFound) {
 			apierr.JSON(c, http.StatusNotFound, apierr.CodeNotFound)
@@ -70,13 +66,9 @@ func (h *SystemAdminHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.ToTenantResponse(t))
 }
 
-// PUT /system/api/tenant/:id
+// PUT /system/api/tenant/:tenantname
 func (h *SystemAdminHandler) Update(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidID)
-		return
-	}
+	tenantName := c.Param("tenantname")
 
 	var req dto.UpdateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -84,7 +76,7 @@ func (h *SystemAdminHandler) Update(c *gin.Context) {
 		return
 	}
 
-	t, err := h.svc.Update(id, req.Name)
+	t, err := h.svc.Update(tenantName, req.Label)
 	if err != nil {
 		if errors.Is(err, ports.ErrNotFound) {
 			apierr.JSON(c, http.StatusNotFound, apierr.CodeNotFound)
@@ -97,15 +89,49 @@ func (h *SystemAdminHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.ToTenantResponse(t))
 }
 
-// DELETE /system/api/tenant/:id
+// DELETE /system/api/tenant/:tenantname
 func (h *SystemAdminHandler) Delete(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidID)
+	tenantName := c.Param("tenantname")
+
+	if err := h.svc.Delete(tenantName); err != nil {
+		if errors.Is(err, ports.ErrNotFound) {
+			apierr.JSON(c, http.StatusNotFound, apierr.CodeNotFound)
+		} else {
+			apierr.JSON(c, http.StatusInternalServerError, apierr.CodeInternal)
+		}
 		return
 	}
 
-	if err := h.svc.Delete(id); err != nil {
+	c.Status(http.StatusNoContent)
+}
+
+// POST /system/api/tenant/:tenantname/admin
+func (h *SystemAdminHandler) SetTenantAdmin(c *gin.Context) {
+	tenantName := c.Param("tenantname")
+
+	var req dto.SetTenantAdminRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidRequest)
+		return
+	}
+
+	if err := h.userSvc.SetTenantAdmin(tenantName, req.UserID); err != nil {
+		if errors.Is(err, ports.ErrNotFound) {
+			apierr.JSON(c, http.StatusNotFound, apierr.CodeNotFound)
+		} else {
+			apierr.JSON(c, http.StatusInternalServerError, apierr.CodeInternal)
+		}
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// POST /system/api/tenant/:tenantname/ban
+func (h *SystemAdminHandler) BanTenant(c *gin.Context) {
+	tenantName := c.Param("tenantname")
+
+	if err := h.svc.Ban(tenantName); err != nil {
 		if errors.Is(err, ports.ErrNotFound) {
 			apierr.JSON(c, http.StatusNotFound, apierr.CodeNotFound)
 		} else {
@@ -118,20 +144,15 @@ func (h *SystemAdminHandler) Delete(c *gin.Context) {
 }
 
 // GET /system/api/user
-// GET /system/api/user?tenant_id=<uuid>
+// GET /system/api/user?tenant_name=<name>
 // GET /system/api/user?email=<email>
-// GET /system/api/user?tenant_id=<uuid>&email=<email>
+// GET /system/api/user?tenant_name=<name>&email=<email>
 func (h *SystemAdminHandler) GetAllUsers(c *gin.Context) {
-	rawTenantID := c.Query("tenant_id")
+	tenantName := c.Query("tenant_name")
 	email := c.Query("email")
 
-	if rawTenantID != "" && email != "" {
-		tenantID, err := uuid.Parse(rawTenantID)
-		if err != nil {
-			apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidTenantID)
-			return
-		}
-		u, err := h.userSvc.GetByTenantAndEmail(tenantID, email)
+	if tenantName != "" && email != "" {
+		u, err := h.userSvc.GetByTenantAndEmail(tenantName, email)
 		if err != nil {
 			if errors.Is(err, ports.ErrNotFound) {
 				apierr.JSON(c, http.StatusNotFound, apierr.CodeNotFound)
@@ -144,13 +165,8 @@ func (h *SystemAdminHandler) GetAllUsers(c *gin.Context) {
 		return
 	}
 
-	if rawTenantID != "" {
-		tenantID, err := uuid.Parse(rawTenantID)
-		if err != nil {
-			apierr.JSON(c, http.StatusBadRequest, apierr.CodeInvalidTenantID)
-			return
-		}
-		users, err := h.userSvc.GetAllByTenantID(tenantID)
+	if tenantName != "" {
+		users, err := h.userSvc.GetAllByTenantName(tenantName)
 		if err != nil {
 			apierr.JSON(c, http.StatusInternalServerError, apierr.CodeInternal)
 			return

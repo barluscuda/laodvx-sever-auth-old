@@ -25,33 +25,34 @@ const (
 	routeScopeSystemAPI
 )
 
-// GetTenantUUID retrieves the parsed tenant UUID from the request context.
-// Returns uuid.Nil, false when not found or stored in an unexpected format.
+// GetTenantUUID retrieves the tenant UUID from the request context.
+// Returns (uuid.Nil, false) when not present.
 func GetTenantUUID(c *gin.Context) (uuid.UUID, bool) {
 	val, exists := c.Get(TenantIDKey)
 	if !exists {
 		return uuid.Nil, false
 	}
-	tenantID, ok := val.(uuid.UUID)
+	id, ok := val.(uuid.UUID)
 	if !ok {
 		return uuid.Nil, false
 	}
-	return tenantID, true
+	return id, true
 }
 
-// GetTenantID retrieves the tenant_id string from the request context.
-// Returns an empty string if not found.
+// GetTenantID returns the tenant UUID as a string for JWT claim comparison.
+// Returns an empty string if not present.
 func GetTenantID(c *gin.Context) string {
-	if tenantID, ok := GetTenantUUID(c); ok {
-		return tenantID.String()
+	id, ok := GetTenantUUID(c)
+	if !ok {
+		return ""
 	}
-	return ""
+	return id.String()
 }
 
-// ExtractTenantIDFromHeader extracts the tenant_id from the X-Tenant-Id header
+// ExtractTenantIDFromHeader extracts the tenant UUID from the X-Tenant-Id header
 // set by nginx when reverse-proxying tenant requests.
-// If the header is absent the context is left without a tenant_id (system routes).
-// If the header is present but not a valid UUID the request is rejected with 400.
+// If the header is absent the context is left without a tenant (system routes).
+// If the header is present but not a valid UUID, the request is rejected with 400.
 func ExtractTenantIDFromHeader() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		raw := strings.TrimSpace(c.GetHeader(TenantIDHeader))
@@ -60,18 +61,18 @@ func ExtractTenantIDFromHeader() gin.HandlerFunc {
 			return
 		}
 
-		tenantID, err := uuid.Parse(raw)
+		id, err := uuid.Parse(raw)
 		if err != nil {
 			apierr.Abort(c, http.StatusBadRequest, apierr.CodeInvalidTenantID)
 			return
 		}
 
-		c.Set(TenantIDKey, tenantID)
+		c.Set(TenantIDKey, id)
 		c.Next()
 	}
 }
 
-// EnforceRouteScope ensures that tenant API routes are called with a tenant_id header
+// EnforceRouteScope ensures that tenant API routes are called with a tenant ID header
 // and system API routes are called without one.
 func EnforceRouteScope() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -107,9 +108,9 @@ func classifyRouteScope(requestPath string) routeScope {
 	}
 }
 
-// TenantNotFound validates that a tenant exists when a tenant_id header is present.
-// If tenant_id is in the context but the tenant doesn't exist in the database, returns 404.
-// If no tenant_id is present, skips this middleware.
+// TenantNotFound validates that a tenant exists when a tenant UUID header is present.
+// If the UUID is in the context but the tenant doesn't exist in the database, returns 404.
+// If no tenant UUID is present, skips this middleware.
 func TenantNotFound(repo ports.TenantRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tenantID, ok := GetTenantUUID(c)
@@ -118,7 +119,7 @@ func TenantNotFound(repo ports.TenantRepository) gin.HandlerFunc {
 			return
 		}
 
-		exists, err := repo.ExistsByID(tenantID)
+		exists, err := repo.ExistsByUUID(tenantID)
 		if err != nil {
 			apierr.Abort(c, http.StatusInternalServerError, apierr.CodeInternal)
 			return

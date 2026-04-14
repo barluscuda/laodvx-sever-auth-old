@@ -13,6 +13,7 @@ import (
 type Repository struct {
 	Tenant              ports.TenantRepository
 	TenantUser          ports.TenantUserRepository
+	SystemUser          ports.SystemUserRepository
 	PendingRegistration ports.PendingRegistrationStore
 	SystemAdmin         ports.SystemAdminRepository
 	RefreshToken        ports.RefreshTokenRepository
@@ -20,9 +21,11 @@ type Repository struct {
 }
 
 func New(db *gorm.DB, rdb *redis.Client, cacheTTL time.Duration, rateLimitCfg config.RateLimitConfig) *Repository {
+	tenantUserRepo := NewCachedTenantUserRepository(NewTenantUserRepository(db), rdb, cacheTTL)
 	return &Repository{
 		Tenant:              NewCachedTenantRepository(NewTenantRepository(db), rdb, cacheTTL),
-		TenantUser:          NewCachedTenantUserRepository(NewTenantUserRepository(db), rdb, cacheTTL),
+		TenantUser:          tenantUserRepo,
+		SystemUser:          tenantUserRepo,
 		PendingRegistration: NewPendingRegistrationStore(rdb),
 		SystemAdmin:         NewSystemAdminRepository(db),
 		RefreshToken:        NewRefreshTokenRepository(db),

@@ -41,26 +41,22 @@ func (r *cachedTenantRepository) GetAll() ([]model.Tenant, error) {
 	return r.repo.GetAll()
 }
 
-func (r *cachedTenantRepository) GetByID(id uuid.UUID) (*model.Tenant, error) {
-	if t, found, cached := r.get(id); cached {
+func (r *cachedTenantRepository) GetByTenantName(tenantName string) (*model.Tenant, error) {
+	if t, found, cached := r.get(tenantName); cached {
 		if !found {
 			return nil, ports.ErrNotFound
 		}
 		return t, nil
 	}
-	t, err := r.repo.GetByID(id)
+	t, err := r.repo.GetByTenantName(tenantName)
 	if err != nil {
 		if errors.Is(err, ports.ErrNotFound) {
-			r.setNotFound(id)
+			r.setNotFound(tenantName)
 		}
 		return nil, err
 	}
 	r.set(t)
 	return t, nil
-}
-
-func (r *cachedTenantRepository) GetByName(name string) (*model.Tenant, error) {
-	return r.repo.GetByName(name)
 }
 
 func (r *cachedTenantRepository) Update(t *model.Tenant) error {
@@ -71,22 +67,22 @@ func (r *cachedTenantRepository) Update(t *model.Tenant) error {
 	return nil
 }
 
-func (r *cachedTenantRepository) Delete(id uuid.UUID) error {
-	if err := r.repo.Delete(id); err != nil {
+func (r *cachedTenantRepository) Delete(tenantName string) error {
+	if err := r.repo.Delete(tenantName); err != nil {
 		return err
 	}
-	r.rdb.Del(context.Background(), tenantCacheKey(id))
+	r.rdb.Del(context.Background(), tenantCacheKey(tenantName))
 	return nil
 }
 
-func (r *cachedTenantRepository) ExistsByID(id uuid.UUID) (bool, error) {
-	if _, found, cached := r.get(id); cached {
+func (r *cachedTenantRepository) ExistsByName(tenantName string) (bool, error) {
+	if _, found, cached := r.get(tenantName); cached {
 		return found, nil
 	}
-	t, err := r.repo.GetByID(id)
+	t, err := r.repo.GetByTenantName(tenantName)
 	if err != nil {
 		if errors.Is(err, ports.ErrNotFound) {
-			r.setNotFound(id)
+			r.setNotFound(tenantName)
 			return false, nil
 		}
 		return false, err
@@ -95,24 +91,36 @@ func (r *cachedTenantRepository) ExistsByID(id uuid.UUID) (bool, error) {
 	return true, nil
 }
 
+func (r *cachedTenantRepository) ExistsByUUID(id uuid.UUID) (bool, error) {
+	return r.repo.ExistsByUUID(id)
+}
+
+func (r *cachedTenantRepository) Ban(tenantName string) error {
+	if err := r.repo.Ban(tenantName); err != nil {
+		return err
+	}
+	r.rdb.Del(context.Background(), tenantCacheKey(tenantName))
+	return nil
+}
+
 func (r *cachedTenantRepository) set(t *model.Tenant) {
-	r.setEntry(t.UUID, cachedTenantEntry{Found: true, Tenant: t})
+	r.setEntry(t.TenantName, cachedTenantEntry{Found: true, Tenant: t})
 }
 
-func (r *cachedTenantRepository) setNotFound(id uuid.UUID) {
-	r.setEntry(id, cachedTenantEntry{Found: false})
+func (r *cachedTenantRepository) setNotFound(tenantName string) {
+	r.setEntry(tenantName, cachedTenantEntry{Found: false})
 }
 
-func (r *cachedTenantRepository) setEntry(id uuid.UUID, entry cachedTenantEntry) {
+func (r *cachedTenantRepository) setEntry(tenantName string, entry cachedTenantEntry) {
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return
 	}
-	r.rdb.Set(context.Background(), tenantCacheKey(id), data, r.ttl)
+	r.rdb.Set(context.Background(), tenantCacheKey(tenantName), data, r.ttl)
 }
 
-func (r *cachedTenantRepository) get(id uuid.UUID) (*model.Tenant, bool, bool) {
-	data, err := r.rdb.Get(context.Background(), tenantCacheKey(id)).Bytes()
+func (r *cachedTenantRepository) get(tenantName string) (*model.Tenant, bool, bool) {
+	data, err := r.rdb.Get(context.Background(), tenantCacheKey(tenantName)).Bytes()
 	if err != nil {
 		return nil, false, false
 	}
@@ -130,6 +138,6 @@ func (r *cachedTenantRepository) get(id uuid.UUID) (*model.Tenant, bool, bool) {
 	return entry.Tenant, true, true
 }
 
-func tenantCacheKey(id uuid.UUID) string {
-	return fmt.Sprintf("tenant:%s", id)
+func tenantCacheKey(tenantName string) string {
+	return fmt.Sprintf("tenant:%s", tenantName)
 }

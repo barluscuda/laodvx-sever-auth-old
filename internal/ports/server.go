@@ -8,17 +8,19 @@ import (
 type TenantRepository interface {
 	Create(t *model.Tenant) error
 	GetAll() ([]model.Tenant, error)
-	GetByID(id uuid.UUID) (*model.Tenant, error)
-	GetByName(name string) (*model.Tenant, error)
+	GetByTenantName(tenantName string) (*model.Tenant, error)
 	Update(t *model.Tenant) error
-	Delete(id uuid.UUID) error
-	ExistsByID(id uuid.UUID) (bool, error)
+	Delete(tenantName string) error
+	ExistsByName(tenantName string) (bool, error)
+	ExistsByUUID(id uuid.UUID) (bool, error)
+	Ban(tenantName string) error
 }
 
 type TenantService interface {
-	Create(name string) (*model.Tenant, error)
+	Create(tenantName, label, plan string) (*model.Tenant, error)
 	GetAll() ([]model.Tenant, error)
-	GetByID(id uuid.UUID) (*model.Tenant, error)
-	Update(id uuid.UUID, name string) (*model.Tenant, error)
-	Delete(id uuid.UUID) error
+	GetByTenantName(tenantName string) (*model.Tenant, error)
+	Update(tenantName, label string) (*model.Tenant, error)
+	Delete(tenantName string) error
+	Ban(tenantName string) error
 }

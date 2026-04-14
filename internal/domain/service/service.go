@@ -22,7 +22,7 @@ func NewServices(repos *repository.Repository, cfg config.Config, emailSender po
 		Tenant:         NewTenantService(repos.Tenant),
 		TenantAdmin:    NewTenantAdminService(repos.TenantUser),
 		UserAuth:       NewAuthService(repos.TenantUser, repos.RefreshToken, repos.LoginAttempt, cfg.JWT),
-		SystemAdmin:    NewSystemAdminService(repos.TenantUser),
+		SystemAdmin:    NewSystemAdminService(repos.SystemUser, repos.Tenant),
 		SystemAuth:     NewSystemAuthService(repos.SystemAdmin, repos.RefreshToken, repos.LoginAttempt, cfg.JWT),
 		DevSystemAdmin: NewDevSystemAdminService(repos.SystemAdmin),
 	}

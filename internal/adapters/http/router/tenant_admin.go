@@ -37,9 +37,11 @@ func SetupSystemAdminRouter(r *gin.RouterGroup, cfg config.Config, h *handler.Sy
 		{
 			s.POST("", h.Create)
 			s.GET("", h.GetAll)
-			s.GET("/:id", h.GetByID)
-			s.PUT("/:id", h.Update)
-			s.DELETE("/:id", h.Delete)
+			s.GET("/:tenantname", h.GetByID)
+			s.PUT("/:tenantname", h.Update)
+			s.DELETE("/:tenantname", h.Delete)
+			s.POST("/:tenantname/admin", h.SetTenantAdmin)
+			s.POST("/:tenantname/ban", h.BanTenant)
 		}
 
 		u := protected.Group("/user")

@@ -63,9 +63,9 @@ func issueTokenPair(
 	}
 
 	rt := &model.RefreshToken{
-		TID:       tid,
-		OwnerID:   userID,
-		TenantID:  tenantID,
+		TID:      tid,
+		OwnerID:  userID,
+		TenantID: tenantID,
 		ExpiresAt: refreshExpiry,
 	}
 	if err := rtRepo.Create(rt); err != nil {

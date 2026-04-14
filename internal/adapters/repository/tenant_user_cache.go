@@ -15,16 +15,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-
 type cachedTenantUser struct {
-	UUID          uuid.UUID  `json:"uuid"`
-	TenantID      uuid.UUID  `json:"tenant_id"`
-	Email         string     `json:"email"`
-	Role          string     `json:"role"`
-	EmailVerified bool       `json:"email_verified"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	DeletedAt     *time.Time `json:"deleted_at,omitempty"`
+	UUID      uuid.UUID  `json:"uuid"`
+	TenantID  uuid.UUID  `json:"tenant_id"`
+	Email     string     `json:"email"`
+	Role      string     `json:"role"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 }
 
 type cachedTenantUserEntry struct {
@@ -33,15 +31,14 @@ type cachedTenantUserEntry struct {
 }
 
 type cachedAuthTenantUser struct {
-	UUID          uuid.UUID  `json:"uuid"`
-	TenantID      uuid.UUID  `json:"tenant_id"`
-	Email         string     `json:"email"`
-	Password      string     `json:"password"`
-	Role          string     `json:"role"`
-	EmailVerified bool       `json:"email_verified"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	DeletedAt     *time.Time `json:"deleted_at,omitempty"`
+	UUID      uuid.UUID  `json:"uuid"`
+	TenantID  uuid.UUID  `json:"tenant_id"`
+	Email     string     `json:"email"`
+	Password  string     `json:"password"`
+	Role      string     `json:"role"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 }
 
 type cachedAuthTenantUserEntry struct {
@@ -50,12 +47,12 @@ type cachedAuthTenantUserEntry struct {
 }
 
 type cachedTenantUserRepository struct {
-	repo ports.TenantUserRepository
+	repo ports.SystemUserRepository
 	rdb  *redis.Client
 	ttl  time.Duration
 }
 
-func NewCachedTenantUserRepository(repo ports.TenantUserRepository, rdb *redis.Client, ttl time.Duration) ports.TenantUserRepository {
+func NewCachedTenantUserRepository(repo ports.SystemUserRepository, rdb *redis.Client, ttl time.Duration) ports.SystemUserRepository {
 	return &cachedTenantUserRepository{repo: repo, rdb: rdb, ttl: ttl}
 }
 
@@ -68,7 +65,7 @@ func (r *cachedTenantUserRepository) Create(u *model.TenantUser) error {
 	return nil
 }
 
-func (r *cachedTenantUserRepository) GetByID(tenantID, id uuid.UUID) (*model.TenantUser, error) {
+func (r *cachedTenantUserRepository) GetByID(tenantID uuid.UUID, id uuid.UUID) (*model.TenantUser, error) {
 	if u, found, cached := r.get(tenantID, id); cached {
 		if !found {
 			return nil, ports.ErrNotFound
@@ -136,26 +133,29 @@ func (r *cachedTenantUserRepository) SystemGetByID(id uuid.UUID) (*model.TenantU
 	return u, nil
 }
 
+func (r *cachedTenantUserRepository) SystemSetRole(id uuid.UUID, role string) error {
+	return r.repo.SystemSetRole(id, role)
+}
+
 func (r *cachedTenantUserRepository) setByID(tenantID uuid.UUID, u *model.TenantUser) {
 	r.setIDEntry(tenantID, u.UUID, cachedTenantUserEntry{
 		Found: true,
 		TenantUser: &cachedTenantUser{
-			UUID:          u.UUID,
-			TenantID:      u.TenantID,
-			Email:         u.Email,
-			Role:          u.Role,
-			EmailVerified: u.EmailVerified,
-			CreatedAt:     u.CreatedAt,
-			UpdatedAt:     u.UpdatedAt,
+			UUID:      u.UUID,
+			TenantID:  u.TenantID,
+			Email:     u.Email,
+			Role:      u.Role,
+			CreatedAt: u.CreatedAt,
+			UpdatedAt: u.UpdatedAt,
 		},
 	})
 }
 
-func (r *cachedTenantUserRepository) setNotFoundByID(tenantID, id uuid.UUID) {
+func (r *cachedTenantUserRepository) setNotFoundByID(tenantID uuid.UUID, id uuid.UUID) {
 	r.setIDEntry(tenantID, id, cachedTenantUserEntry{Found: false})
 }
 
-func (r *cachedTenantUserRepository) setIDEntry(tenantID, id uuid.UUID, entry cachedTenantUserEntry) {
+func (r *cachedTenantUserRepository) setIDEntry(tenantID uuid.UUID, id uuid.UUID, entry cachedTenantUserEntry) {
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return
@@ -167,14 +167,13 @@ func (r *cachedTenantUserRepository) setByEmail(tenantID uuid.UUID, u *model.Ten
 	r.setEmailEntry(tenantID, u.Email, cachedAuthTenantUserEntry{
 		Found: true,
 		TenantUser: &cachedAuthTenantUser{
-			UUID:          u.UUID,
-			TenantID:      u.TenantID,
-			Email:         u.Email,
-			Password:      u.Password,
-			Role:          u.Role,
-			EmailVerified: u.EmailVerified,
-			CreatedAt:     u.CreatedAt,
-			UpdatedAt:     u.UpdatedAt,
+			UUID:      u.UUID,
+			TenantID:  u.TenantID,
+			Email:     u.Email,
+			Password:  u.Password,
+			Role:      u.Role,
+			CreatedAt: u.CreatedAt,
+			UpdatedAt: u.UpdatedAt,
 		},
 	})
 }
@@ -191,7 +190,7 @@ func (r *cachedTenantUserRepository) setEmailEntry(tenantID uuid.UUID, email str
 	r.rdb.Set(context.Background(), tenantUserEmailCacheKey(tenantID, email), data, r.ttl)
 }
 
-func (r *cachedTenantUserRepository) get(tenantID, id uuid.UUID) (*model.TenantUser, bool, bool) {
+func (r *cachedTenantUserRepository) get(tenantID uuid.UUID, id uuid.UUID) (*model.TenantUser, bool, bool) {
 	data, err := r.rdb.Get(context.Background(), tenantUserIDCacheKey(tenantID, id)).Bytes()
 	if err != nil {
 		return nil, false, false
@@ -210,13 +209,12 @@ func (r *cachedTenantUserRepository) get(tenantID, id uuid.UUID) (*model.TenantU
 
 	cu := entry.TenantUser
 	return &model.TenantUser{
-		UUID:          cu.UUID,
-		TenantID:      cu.TenantID,
-		Email:         cu.Email,
-		Role:          cu.Role,
-		EmailVerified: cu.EmailVerified,
-		CreatedAt:     cu.CreatedAt,
-		UpdatedAt:     cu.UpdatedAt,
+		UUID:      cu.UUID,
+		TenantID:  cu.TenantID,
+		Email:     cu.Email,
+		Role:      cu.Role,
+		CreatedAt: cu.CreatedAt,
+		UpdatedAt: cu.UpdatedAt,
 	}, true, true
 }
 
@@ -239,19 +237,17 @@ func (r *cachedTenantUserRepository) getByEmail(tenantID uuid.UUID, email string
 
 	cu := entry.TenantUser
 	return &model.TenantUser{
-		UUID:          cu.UUID,
-		TenantID:      cu.TenantID,
-		Email:         cu.Email,
-		Password:      cu.Password,
-		Role:          cu.Role,
-		EmailVerified: cu.EmailVerified,
-		CreatedAt:     cu.CreatedAt,
-		UpdatedAt:     cu.UpdatedAt,
+		UUID:      cu.UUID,
+		TenantID:  cu.TenantID,
+		Email:     cu.Email,
+		Password:  cu.Password,
+		Role:      cu.Role,
+		CreatedAt: cu.CreatedAt,
+		UpdatedAt: cu.UpdatedAt,
 	}, true, true
 }
 
-
-func tenantUserIDCacheKey(tenantID, id uuid.UUID) string {
+func tenantUserIDCacheKey(tenantID uuid.UUID, id uuid.UUID) string {
 	return fmt.Sprintf("user:%s:%s", tenantID, id)
 }
 

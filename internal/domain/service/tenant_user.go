@@ -94,10 +94,9 @@ func (s *tenantUserService) VerifyEmail(tenantID uuid.UUID, email, otp string) e
 	}
 
 	u := &model.TenantUser{
-		TenantID:      tenantID,
-		Email:         reg.Email,
-		Password:      reg.Password,
-		EmailVerified: true,
+		TenantID: tenantID,
+		Email:    reg.Email,
+		Password: reg.Password,
 	}
 	if err := s.repo.Create(u); err != nil {
 		return err
@@ -129,16 +128,12 @@ func (s *tenantUserService) ResendVerification(tenantID uuid.UUID, email string)
 	return s.emailSender.SendVerificationEmail(email, otp)
 }
 
-func (s *tenantUserService) GetByID(tenantID, id uuid.UUID) (*model.TenantUser, error) {
+func (s *tenantUserService) GetByID(tenantID uuid.UUID, id uuid.UUID) (*model.TenantUser, error) {
 	return s.repo.GetByID(tenantID, id)
 }
 
 func (s *tenantUserService) GetByEmail(tenantID uuid.UUID, email string) (*model.TenantUser, error) {
 	return s.repo.GetByEmail(tenantID, email)
-}
-
-func (s *tenantUserService) GetAllServer() ([]model.TenantUser, error) {
-	return s.repo.SystemGetAll()
 }
 
 // generateOTP returns a cryptographically random 6-digit numeric string.

@@ -23,6 +23,6 @@ func (s *tenantAdminService) GetByEmail(tenantID uuid.UUID, email string) (*mode
 	return s.repo.GetByEmail(tenantID, email)
 }
 
-func (s *tenantAdminService) GetByID(tenantID, id uuid.UUID) (*model.TenantUser, error) {
+func (s *tenantAdminService) GetByID(tenantID uuid.UUID, id uuid.UUID) (*model.TenantUser, error) {
 	return s.repo.GetByID(tenantID, id)
 }

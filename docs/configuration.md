@@ -23,10 +23,8 @@ Wizard behavior:
 | `SERVER_MODE` | App mode. `release` disables the dev server. | `release` |
 | `SERVER_IP` | Bind address for the main server. | `127.0.0.1` |
 | `SERVER_PORT` | Main server port. | `3220` |
-| `SERVER_DOMAIN` | Base domain used to detect tenant subdomains. | `auth.localhost` |
 | `SERVER_DEV_IP` | Bind address for the dev server. | `127.0.0.1` |
 | `SERVER_DEV_PORT` | Dev server port. | `3221` |
-| `SERVER_DEV_DOMAIN` | Dev server domain label. | `auth.localhost` |
 | `DEV_API_KEY` | Required for every dev-server request. | required in non-release mode |
 | `ENABLE_PPROF` | Enables `/debug/pprof/*` on the dev server. | `false` |
 
@@ -135,7 +133,6 @@ For most developers:
 - `SERVER_MODE=debug`
 - `SERVER_IP=127.0.0.1`
 - `SERVER_PORT=3220`
-- `SERVER_DOMAIN=auth.localhost`
 - `SERVER_DEV_IP=127.0.0.1`
 - `SERVER_DEV_PORT=3221`
 - Docker for PostgreSQL and Redis
@@ -144,7 +141,6 @@ For most developers:
 
 - `SERVER_MODE=release`
 - `SERVER_IP=0.0.0.0`
-- `SERVER_DOMAIN=auth.your-domain.com`
 - `SERVER_DEV_IP` unused because the dev server should not start
 - strong database credentials
 - TLS handled by your reverse proxy or ingress

@@ -35,11 +35,11 @@ const (
 )
 
 type Handlers struct {
-	TenantUser           *handler.TenantUserHandler
+	TenantUser     *handler.TenantUserHandler
 	Auth           *handler.AuthHandler
 	SystemAdmin    *handler.SystemAdminHandler
 	SystemAuth     *handler.SystemAuthHandler
-	TenantAdmin      *handler.TenantAdminHandler
+	TenantAdmin    *handler.TenantAdminHandler
 	DevSystemAdmin *handler.DevSystemAdminHandler
 }
 

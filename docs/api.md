@@ -4,22 +4,13 @@ This is a practical guide to the available endpoints. If you want ready-to-run r
 
 ## Before You Call Anything
 
-There are two host styles:
-
-- tenant routes: `{server_id}.auth.localhost`
-- system routes: `auth.localhost`
-
-Examples:
+Tenant routes (`/api/*`) require an `X-Tenant-Id` header containing the tenant UUID:
 
 ```text
-http://127.0.0.1:3220/api/auth/login
-Host: <server_id>.auth.localhost
+X-Tenant-Id: <tenant-id>
 ```
 
-```text
-http://127.0.0.1:3220/system/api/auth/login
-Host: auth.localhost
-```
+System routes (`/system/api/*`) must be called without `X-Tenant-Id`.
 
 Protected routes use:
 
@@ -41,13 +32,7 @@ Returns the public key set for verifying access tokens.
 
 ### `GET /api/ping`
 
-Tenant-scoped health check.
-
-Call it on a tenant host:
-
-```text
-Host: <server_id>.auth.localhost
-```
+Tenant-scoped health check. Requires `X-Tenant-Id: <tenant-id>`.
 
 ## Tenant User Endpoints
 
@@ -160,7 +145,7 @@ Find a user by UUID inside the current tenant.
 
 ## System Admin Authentication
 
-These routes use the base domain host, not a tenant host.
+These routes must be called without `X-Tenant-Id`.
 
 ### `POST /system/api/auth/login`
 

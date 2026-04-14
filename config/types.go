@@ -25,17 +25,11 @@ type ServerConfig struct {
 	// SERVER_IP — Bind IP for the main API server. Default: 127.0.0.1.
 	IP string
 
-	// SERVER_DOMAIN — Base domain for subdomain-based tenant routing. Default: auth.localhost.
-	Domain string
-
 	// SERVER_PORT — Listening port for the main API server. Default: 3220.
 	Port string
 
 	// SERVER_DEV_IP — Bind IP for the dev/internal server. Default: 127.0.0.1.
 	DevIP string
-
-	// SERVER_DEV_DOMAIN — Base domain for the dev server. Default: auth.localhost.
-	DevDomain string
 
 	// SERVER_DEV_PORT — Listening port for the dev server. Default: 3221.
 	DevPort string

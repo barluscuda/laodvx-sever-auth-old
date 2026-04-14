@@ -10,7 +10,7 @@ Supports multi-server tenancy — users are scoped to a registered server, so th
 - **Redis 7** — caching + login-attempt tracking
 - **Docker** — containerization
 - **ES256 (P-256)** — JWT signing with auto-rotating key pairs
-- **Subdomain-based routing** — `{server_id}.auth.localhost/api/*` for multi-tenancy
+- **Header-based tenant routing** — `X-Tenant-Id` header carries the tenant UUID; nginx extracts it from the subdomain in production
 
 ## Quick start
 
@@ -20,11 +20,7 @@ make docker-services # start postgres + redis
 make run             # run server locally
 ```
 
-Server binds to `auth.localhost:3220` by default. Add to `/etc/hosts`:
-```
-127.0.0.1 auth.localhost
-127.0.0.1 *.auth.localhost
-```
+Server binds to `127.0.0.1:3220` by default. Pass `X-Tenant-Id: <tenant-id>` on tenant API calls.
 
 See [Getting Started](docs/getting-started.md) for detailed setup instructions.
 

@@ -34,15 +34,9 @@ api-docs/                   Postman collection
 
 ### Tenant Servers
 
-`Server` is a first-class model. Every user belongs to a server, and the active server is taken from the request host.
+`Server` is a first-class model. Every user belongs to a server, and the active server is identified by the `X-Tenant-Id` request header, which must contain the tenant UUID.
 
-Example:
-
-```text
-<server_id>.auth.localhost
-```
-
-That `server_id` is parsed in middleware before the request reaches handlers.
+In production, nginx extracts the `server_id` from the subdomain and sets this header before forwarding. For local development, pass the header directly.
 
 ### Roles
 
@@ -85,12 +79,12 @@ If Redis is down during login, auth fails instead of silently disabling protecti
 
 Main middleware responsibilities:
 
-- extract tenant `server_id` from subdomain
+- extract tenant `server_id` from `X-Tenant-Id` header
 - reject invalid tenant IDs early
 - confirm the tenant server exists
 - validate access tokens
 - enforce role checks
-- ensure tenant tokens match the tenant host
+- ensure tenant tokens match the tenant server
 
 ## Security Notes
 

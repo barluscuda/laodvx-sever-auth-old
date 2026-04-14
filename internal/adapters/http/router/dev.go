@@ -15,7 +15,7 @@ func SetupDevRouter(r *gin.Engine, cfg config.Config, devSystemAdmin *handler.De
 	if cfg.Server.EnablePprof {
 		debug := r.Group("/debug")
 		debug.Use(devAuth)
-		pprof.Register(debug)
+		pprof.Register(debug, "pprof")
 	}
 
 	api := r.Group("/api")

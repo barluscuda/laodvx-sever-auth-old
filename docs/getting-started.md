@@ -6,33 +6,22 @@ This guide gets `laodvx-server-auth` running on a local machine with the least a
 
 - Go `1.26+`
 - Docker
-- A local hosts entry for `auth.localhost`
 
 ## How Routing Works
 
-This service uses the request host to decide which tenant server a request belongs to.
+The server identifies tenants from the `X-Tenant-Id` request header, which must contain the tenant server's UUID.
 
-- Base domain: `auth.localhost`
-- Tenant host: `{server_id}.auth.localhost`
-- System admin host: `auth.localhost`
+- Tenant API routes (`/api/*`) require `X-Tenant-Id: <tenant-id>`
+- System routes (`/system/api/*`) must be called without `X-Tenant-Id`
+
+In production, nginx extracts the `server_id` from the subdomain and sets this header before forwarding. For local development and direct API calls (Postman, curl), pass the header manually.
 
 Examples:
 
-- User login: `http://localhost:3220/api/auth/login` with `Host: {server_id}.auth.localhost`
-- System admin login: `http://localhost:3220/system/api/auth/login` with `Host: auth.localhost`
+- User login: `POST http://127.0.0.1:3220/api/auth/login` with `X-Tenant-Id: <tenant-id>`
+- System admin login: `POST http://127.0.0.1:3220/system/api/auth/login` (no `X-Tenant-Id`)
 
-## 1. Add Local Hosts
-
-Add entries like these to `/etc/hosts`:
-
-```text
-127.0.0.1 auth.localhost
-127.0.0.1 <server-uuid>.auth.localhost
-```
-
-Replace `<server-uuid>` with a real server UUID after you create one.
-
-## 2. Create `.env`
+## 1. Create `.env`
 
 Run:
 
@@ -68,7 +57,7 @@ If `.env` already exists:
 - `make config-reset` overwrites the file with fresh defaults
 - legacy aliases `make env`, `make env-update`, and `make env-reset` still work
 
-## 3. Start Infrastructure
+## 2. Start Infrastructure
 
 ```bash
 make docker-services
@@ -79,7 +68,7 @@ This starts:
 - PostgreSQL
 - Redis
 
-## 4. Start The Server
+## 3. Start The Server
 
 For local development:
 
@@ -93,12 +82,12 @@ For full Docker:
 make docker-stack
 ```
 
-## 5. Check That It Works
+## 4. Check That It Works
 
 Main server:
 
 ```bash
-curl -H 'Host: auth.localhost' http://127.0.0.1:3220/.well-known/jwks.json
+curl http://127.0.0.1:3220/.well-known/jwks.json
 ```
 
 Dev server, non-release modes only:
@@ -136,8 +125,8 @@ The Postman collection in [api-docs/laodvx-server-auth.postman_collection.json](
 
 ## If Something Fails
 
-- If user routes return `err_invalid_server_id`, the host name is wrong.
-- If tenant routes return `err_not_found`, the `server_id` in the subdomain does not exist yet.
+- If user routes return `err_invalid_server_id`, the `X-Tenant-Id` header is missing or not a valid UUID.
+- If tenant routes return `err_not_found`, the UUID in `X-Tenant-Id` does not match any registered server.
 - If the dev server returns `err_missing_auth`, your `X-Dev-API-Key` header is missing or wrong.
 - If PostgreSQL on `localhost` refuses TLS, set `DB_SSLMODE=disable`.
 - If the app cannot start, check PostgreSQL, Redis, and required JWT key settings in `.env`.

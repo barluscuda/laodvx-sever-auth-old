@@ -28,29 +28,20 @@ func Load() {
 			log.Fatal("DEV_API_KEY must be set when running in non-release mode — refusing to start")
 		}
 
-		// Parse server configuration from separate IP and domain env vars
-		serverIP := getEnv("SERVER_IP", "127.0.0.1")
-		serverDomain := getEnv("SERVER_DOMAIN", "auth.localhost")
-
-		devIP := getEnv("SERVER_DEV_IP", "127.0.0.1")
-		devDomain := getEnv("SERVER_DEV_DOMAIN", "auth.localhost")
-
 		instance = Config{
 			Server: ServerConfig{
-				Mode:        getEnv("SERVER_MODE", "release"),
-				IP:          serverIP,
-				Domain:      serverDomain,
-				Port:        getEnv("SERVER_PORT", "3220"),
-				DevIP:       devIP,
-				DevDomain:   devDomain,
-				DevPort:     getEnv("SERVER_DEV_PORT", "3221"),
+				Mode:    getEnv("SERVER_MODE", "release"),
+				IP:      getEnv("SERVER_IP", "127.0.0.1"),
+				Port:    getEnv("SERVER_PORT", "3220"),
+				DevIP:   getEnv("SERVER_DEV_IP", "127.0.0.1"),
+				DevPort: getEnv("SERVER_DEV_PORT", "3221"),
 				EnablePprof: getEnv("ENABLE_PPROF", "false") == "true",
 				DevAPIKey:   devAPIKey,
 			},
 			Database: DatabaseConfig{
 				Host:            getEnv("DB_HOST", "localhost"),
 				Port:            getEnv("DB_PORT", "5432"),
-				TenantUser:            getEnv("DB_USER", "postgres"),
+				TenantUser:      getEnv("DB_USER", "postgres"),
 				Password:        getEnv("DB_PASSWORD", "postgres"),
 				Name:            getEnv("DB_NAME", "dx_auth"),
 				SSLMode:         getEnv("DB_SSLMODE", "require"),
